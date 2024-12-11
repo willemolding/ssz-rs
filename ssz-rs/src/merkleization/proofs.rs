@@ -174,6 +174,13 @@ pub trait Prove: GeneralizedIndexable {
     fn multi_prove(&self, paths: &[Path]) -> Result<(MultiProof, Node), Error> {
         let indices: Vec<GeneralizedIndex> =
             paths.iter().map(|x| Self::generalized_index(x).unwrap()).collect();
+        self.multi_prove_gindices(&indices)
+    }
+
+    fn multi_prove_gindices(
+        &self,
+        indices: &[GeneralizedIndex],
+    ) -> Result<(MultiProof, Node), Error> {
         let helpers = multiproofs::get_helper_indices(&indices);
         let mut proof = MultiProof { leaves: vec![], branch: vec![], indices: vec![] };
         let mut witness: Node = Node::ZERO;
