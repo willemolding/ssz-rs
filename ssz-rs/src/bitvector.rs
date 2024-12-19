@@ -120,7 +120,7 @@ impl<const N: usize> Serializable for Bitvector<N> {
 impl<const N: usize> Serialize for Bitvector<N> {
     fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, SerializeError> {
         if N == 0 {
-            return Err(TypeError::InvalidBound(N).into())
+            return Err(TypeError::InvalidBound(N).into());
         }
         let bytes_to_write = Self::size_hint();
         buffer.reserve(bytes_to_write);
@@ -134,7 +134,7 @@ impl<const N: usize> Serialize for Bitvector<N> {
 impl<const N: usize> Deserialize for Bitvector<N> {
     fn deserialize(encoding: &[u8]) -> Result<Self, DeserializeError> {
         if N == 0 {
-            return Err(TypeError::InvalidBound(N).into())
+            return Err(TypeError::InvalidBound(N).into());
         }
 
         let expected_length = byte_length(N);
@@ -142,13 +142,13 @@ impl<const N: usize> Deserialize for Bitvector<N> {
             return Err(DeserializeError::ExpectedFurtherInput {
                 provided: encoding.len(),
                 expected: expected_length,
-            })
+            });
         }
         if encoding.len() > expected_length {
             return Err(DeserializeError::AdditionalInput {
                 provided: encoding.len(),
                 expected: expected_length,
-            })
+            });
         }
 
         let mut result = Self::default();
@@ -160,7 +160,7 @@ impl<const N: usize> Deserialize for Bitvector<N> {
             let last_byte = encoding.last().unwrap();
             let remainder_bits = last_byte >> remainder_count;
             if remainder_bits != 0 {
-                return Err(DeserializeError::InvalidByte(*last_byte))
+                return Err(DeserializeError::InvalidByte(*last_byte));
             }
         }
         Ok(result)
@@ -187,12 +187,12 @@ impl<const N: usize> GeneralizedIndexable for Bitvector<N> {
             match next {
                 PathElement::Index(i) => {
                     if *i >= N {
-                        return Err(MerkleizationError::InvalidPathElement(next.clone()))
+                        return Err(MerkleizationError::InvalidPathElement(next.clone()));
                     }
                     let chunk_position = i / 256;
-                    let child = parent *
-                        get_power_of_two_ceil(<Self as GeneralizedIndexable>::chunk_count()) +
-                        chunk_position;
+                    let child = parent
+                        * get_power_of_two_ceil(<Self as GeneralizedIndexable>::chunk_count())
+                        + chunk_position;
                     // NOTE: use `bool` as effective type of element
                     bool::compute_generalized_index(child, rest)
                 }

@@ -16,13 +16,13 @@ impl Deserialize for Node {
             return Err(DeserializeError::ExpectedFurtherInput {
                 provided: encoding.len(),
                 expected: BYTES_PER_CHUNK,
-            })
+            });
         }
         if encoding.len() > BYTES_PER_CHUNK {
             return Err(DeserializeError::AdditionalInput {
                 provided: encoding.len(),
                 expected: BYTES_PER_CHUNK,
-            })
+            });
         }
 
         // SAFETY: index is safe because encoding.len() == byte_size; qed

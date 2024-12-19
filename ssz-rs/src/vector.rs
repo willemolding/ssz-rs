@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::{
     de::{deserialize_homogeneous_composite, Deserialize, DeserializeError},
     error::{Error, InstanceError, TypeError},
@@ -19,6 +21,8 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
 pub struct Vector<T: Serializable, const N: usize> {
     data: Vec<T>,
+    #[serde(skip)]
+    chunk_cache: RefCell<Option<Vec<u8>>>,
 }
 
 impl<T: Serializable, const N: usize> AsRef<[T]> for Vector<T, N> {
@@ -40,13 +44,13 @@ impl<T: Serializable, const N: usize> TryFrom<Vec<T>> for Vector<T, N> {
 
     fn try_from(data: Vec<T>) -> Result<Self, Self::Error> {
         if N == 0 {
-            return Err((data, Error::Type(TypeError::InvalidBound(N))))
+            return Err((data, Error::Type(TypeError::InvalidBound(N))));
         }
         if data.len() != N {
             let len = data.len();
             Err((data, Error::Instance(InstanceError::Exact { required: N, provided: len })))
         } else {
-            Ok(Self { data })
+            Ok(Self { data, chunk_cache: RefCell::new(None) })
         }
     }
 }
@@ -59,13 +63,13 @@ where
 
     fn try_from(data: &[T]) -> Result<Self, Self::Error> {
         if N == 0 {
-            return Err(Error::Type(TypeError::InvalidBound(N)))
+            return Err(Error::Type(TypeError::InvalidBound(N)));
         }
         if data.len() != N {
             let len = data.len();
             Err(Error::Instance(InstanceError::Exact { required: N, provided: len }))
         } else {
-            Ok(Self { data: data.to_vec() })
+            Ok(Self { data: data.to_vec(), chunk_cache: RefCell::new(None) })
         }
     }
 }
@@ -164,7 +168,7 @@ where
 {
     fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, SerializeError> {
         if N == 0 {
-            return Err(TypeError::InvalidBound(N).into())
+            return Err(TypeError::InvalidBound(N).into());
         }
         let mut serializer = Serializer::default();
         for element in &self.data {
@@ -180,7 +184,7 @@ where
 {
     fn deserialize(encoding: &[u8]) -> Result<Self, DeserializeError> {
         if N == 0 {
-            return Err(TypeError::InvalidBound(N).into())
+            return Err(TypeError::InvalidBound(N).into());
         }
         if !T::is_variable_size() {
             let expected_length = N * T::size_hint();
@@ -188,13 +192,13 @@ where
                 return Err(DeserializeError::ExpectedFurtherInput {
                     provided: encoding.len(),
                     expected: expected_length,
-                })
+                });
             }
             if encoding.len() > expected_length {
                 return Err(DeserializeError::AdditionalInput {
                     provided: encoding.len(),
                     expected: expected_length,
-                })
+                });
             }
         }
         let inner = deserialize_homogeneous_composite(encoding)?;
@@ -211,13 +215,29 @@ impl<T, const N: usize> Vector<T, N>
 where
     T: SimpleSerialize,
 {
+    // fn assemble_chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
+    //     if T::is_composite_type() {
+    //         let count = self.len();
+    //         elements_to_chunks(self.data.iter().enumerate(), count)
+    //     } else {
+    //         pack(&self.data)
+    //     }
+    // }
+
     fn assemble_chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
-        if T::is_composite_type() {
+        if let Some(ref chunks) = *self.chunk_cache.borrow() {
+            tracing::debug!("Using cached chunks for List");
+            return Ok(chunks.clone());
+        }
+        tracing::debug!("Cache miss, recomputing cached chunks for List");
+        let chunks = if T::is_composite_type() {
             let count = self.len();
             elements_to_chunks(self.data.iter().enumerate(), count)
         } else {
-            pack(&self.data)
-        }
+            pack(self)
+        }?;
+        self.chunk_cache.borrow_mut().replace(chunks.clone());
+        Ok(chunks)
     }
 
     fn compute_hash_tree_root(&self) -> Result<Node, MerkleizationError> {
@@ -251,7 +271,7 @@ where
             match next {
                 PathElement::Index(i) => {
                     if *i >= N {
-                        return Err(MerkleizationError::InvalidPathElement(next.clone()))
+                        return Err(MerkleizationError::InvalidPathElement(next.clone()));
                     }
                     let chunk_position = i * T::item_length() / 32;
                     let child =

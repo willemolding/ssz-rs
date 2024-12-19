@@ -40,13 +40,13 @@ macro_rules! define_uint {
                     return Err(DeserializeError::ExpectedFurtherInput {
                         provided: encoding.len(),
                         expected: byte_size,
-                    })
+                    });
                 }
                 if encoding.len() > byte_size {
                     return Err(DeserializeError::AdditionalInput {
                         provided: encoding.len(),
                         expected: byte_size,
-                    })
+                    });
                 }
 
                 // SAFETY: index is safe because encoding.len() has been checked above; qed
@@ -120,13 +120,13 @@ impl Deserialize for U256 {
             return Err(DeserializeError::ExpectedFurtherInput {
                 provided: encoding.len(),
                 expected: U256_BYTE_COUNT,
-            })
+            });
         }
         if encoding.len() > U256_BYTE_COUNT {
             return Err(DeserializeError::AdditionalInput {
                 provided: encoding.len(),
                 expected: U256_BYTE_COUNT,
-            })
+            });
         }
 
         // SAFETY: index is safe because encoding.len() == byte_size; qed
