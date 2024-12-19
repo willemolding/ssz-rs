@@ -67,9 +67,20 @@ impl Prover {
 
     /// Derive a Merkle proof relative to `data` given the parameters in `self`.
     pub fn compute_proof<T: Prove + ?Sized>(&mut self, data: &T) -> Result<(), Error> {
+        let tree = data.compute_tree(&mut self.hasher)?;
+        self.compute_proof_cached_tree(data, &tree)
+    }
+
+    /// Derive a Merkle proof relative to `data` given the parameters in `self` using a precomputed tree
+    pub fn compute_proof_cached_tree<T: Prove + ?Sized>(
+        &mut self,
+        data: &T,
+        tree: &Tree,
+    ) -> Result<(), Error> {
         let chunk_count = T::chunk_count();
         let mut leaf_count = chunk_count.next_power_of_two();
         let parent_index = self.proof.index;
+
         let decoration = data.decoration();
         if decoration.is_some() {
             // double to account for decoration layer
@@ -92,13 +103,6 @@ impl Prover {
         } else {
             // NOTE: leaf is within the current object, set a flag to grab from merkle tree later
             is_leaf_local = true;
-        }
-
-        let chunks = data.chunks()?;
-        let mut tree = Tree::new(&chunks, leaf_count)?;
-
-        if let Some(decoration) = decoration {
-            tree.mix_in_decoration(decoration, &mut self.hasher)?;
         }
 
         let mut target = local_generalized_index;
@@ -185,9 +189,11 @@ pub trait Prove: GeneralizedIndexable {
         let mut proof = MultiProof { leaves: vec![], branch: vec![], indices: vec![] };
         let mut witness: Node = Node::ZERO;
 
+        let tree = self.compute_tree(&mut Sha256::new())?;
+
         for index in indices.iter() {
             let mut prover = Prover::from(*index);
-            prover.compute_proof(self)?;
+            prover.compute_proof_cached_tree(self, &tree)?;
             proof.leaves.push(prover.proof.leaf);
             proof.indices.push(prover.proof.index);
             witness = prover.witness;
@@ -195,11 +201,30 @@ pub trait Prove: GeneralizedIndexable {
 
         for helper in helpers.iter() {
             let mut prover = Prover::from(*helper);
-            prover.compute_proof(self)?;
+            prover.compute_proof_cached_tree(self, &tree)?;
             proof.branch.push(prover.proof.leaf);
         }
 
         Ok((proof, witness))
+    }
+
+    fn compute_tree(&self, hasher: &mut Sha256) -> Result<Tree, Error> {
+        let mut leaf_count = Self::chunk_count().next_power_of_two();
+
+        let decoration = self.decoration();
+        if decoration.is_some() {
+            // double to account for decoration layer
+            leaf_count *= 2;
+        }
+
+        let chunks = self.chunks()?;
+        let mut tree = Tree::new(&chunks, leaf_count)?;
+
+        if let Some(decoration) = decoration {
+            tree.mix_in_decoration(decoration, hasher)?;
+        }
+
+        Ok(tree)
     }
 }
 
