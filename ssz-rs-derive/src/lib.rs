@@ -115,7 +115,7 @@ fn derive_deserialize_impl(data: &Data, helper_attr: Option<&HelperAttr>) -> Tok
                             let result = <#field_type>::deserialize(&encoding)?;
                             Ok(Self(result))
                         }
-                    }
+                    };
                 }
                 _ => unimplemented!(
                     "this type of struct is currently not supported by this derive macro"

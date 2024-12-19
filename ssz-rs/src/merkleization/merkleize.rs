@@ -7,7 +7,7 @@ use crate::{
 };
 #[cfg(feature = "serde")]
 use alloy_primitives::hex::FromHex;
-use sha2::{Digest, Sha256};
+use ethereum_hashing::hash32_concat;
 
 // The generalized index for the root of the "decorated" type in any Merkleized type that supports
 // decoration.
@@ -52,10 +52,8 @@ where
     Ok(buffer)
 }
 
-fn hash_nodes(hasher: &mut Sha256, a: impl AsRef<[u8]>, b: impl AsRef<[u8]>, out: &mut [u8]) {
-    hasher.update(a);
-    hasher.update(b);
-    out.copy_from_slice(&hasher.finalize_reset());
+fn hash_nodes(a: impl AsRef<[u8]>, b: impl AsRef<[u8]>, out: &mut [u8]) {
+    out.copy_from_slice(&hash32_concat(a.as_ref(), b.as_ref()));
 }
 
 const MAX_MERKLE_TREE_DEPTH: usize = 64;
@@ -95,9 +93,8 @@ pub fn merkleize(chunks: &[u8], limit: Option<usize>) -> Result<Node, Error> {
 fn mix_in_decoration(root: Node, decoration: usize) -> Node {
     let decoration_data = decoration.hash_tree_root().expect("can merkleize usize");
 
-    let mut hasher = Sha256::new();
     let mut output = vec![0u8; BYTES_PER_CHUNK];
-    hash_nodes(&mut hasher, root, decoration_data, &mut output);
+    hash_nodes(root, decoration_data, &mut output);
     output.as_slice().try_into().expect("can extract root")
 }
 
@@ -143,17 +140,14 @@ impl Tree {
         Ok(tree)
     }
 
-    pub fn mix_in_decoration(
-        &mut self,
-        decoration: usize,
-        hasher: &mut Sha256,
-    ) -> Result<(), Error> {
+    pub fn mix_in_decoration(&mut self, decoration: usize) -> Result<(), Error> {
         let target_node = &mut self[DECORATION_GENERALIZED_INDEX];
         let decoration_node = decoration.hash_tree_root()?;
         target_node.copy_from_slice(decoration_node.as_ref());
-        hasher.update(&self[INNER_ROOT_GENERALIZED_INDEX]);
-        hasher.update(&self[DECORATION_GENERALIZED_INDEX]);
-        self[1].copy_from_slice(&hasher.finalize_reset());
+
+        let l = self[INNER_ROOT_GENERALIZED_INDEX].to_vec().clone();
+        let r = self[DECORATION_GENERALIZED_INDEX].to_vec().clone();
+        self[1].copy_from_slice(&hash32_concat(&l, &r));
         Ok(())
     }
 
@@ -193,7 +187,6 @@ impl Tree {
         }
 
         let mut last_index = chunk_count;
-        let mut hasher = Sha256::new();
         // for each layer of the tree, starting from the bottom and walking up to the root:
         for k in (1..depth).rev() {
             // for each pair of value nodes in this layer:
@@ -202,7 +195,7 @@ impl Tree {
                 let left = self[g_index].to_vec();
                 let right = self[g_index + 1].to_vec();
                 let parent = &mut self[g_index / 2];
-                hash_nodes(&mut hasher, left, right, parent);
+                hash_nodes(left, right, parent);
             }
             last_index = (last_index + 1) / 2;
         }

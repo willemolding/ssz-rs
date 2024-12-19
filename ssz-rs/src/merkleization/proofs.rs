@@ -7,7 +7,7 @@ use crate::{
         Path, Tree,
     },
 };
-use sha2::{Digest, Sha256};
+use ethereum_hashing::hash32_concat;
 
 /// Convenience type for a Merkle proof and the root of the Merkle tree, which serves as
 /// "witness" that the proof is valid.
@@ -45,7 +45,6 @@ pub(crate) fn compute_local_merkle_coordinates(
 /// A type that knows how to compute Merkle proofs assuming a target type is `Prove`.
 #[derive(Debug)]
 pub struct Prover {
-    hasher: Sha256,
     proof: Proof,
     witness: Node,
 }
@@ -67,7 +66,7 @@ impl Prover {
 
     /// Derive a Merkle proof relative to `data` given the parameters in `self`.
     pub fn compute_proof<T: Prove + ?Sized>(&mut self, data: &T) -> Result<(), Error> {
-        let tree = data.compute_tree(&mut self.hasher)?;
+        let tree = data.compute_tree()?;
         self.compute_proof_cached_tree(data, &tree)
     }
 
@@ -133,7 +132,6 @@ impl From<Prover> for ProofAndWitness {
 impl From<GeneralizedIndex> for Prover {
     fn from(index: GeneralizedIndex) -> Self {
         Self {
-            hasher: Sha256::new(),
             proof: Proof { leaf: Default::default(), branch: vec![], index },
             witness: Default::default(),
         }
@@ -189,7 +187,7 @@ pub trait Prove: GeneralizedIndexable {
         let mut proof = MultiProof { leaves: vec![], branch: vec![], indices: vec![] };
         let mut witness: Node = Node::ZERO;
 
-        let tree = self.compute_tree(&mut Sha256::new())?;
+        let tree = self.compute_tree()?;
 
         for index in indices.iter() {
             let mut prover = Prover::from(*index);
@@ -208,7 +206,7 @@ pub trait Prove: GeneralizedIndexable {
         Ok((proof, witness))
     }
 
-    fn compute_tree(&self, hasher: &mut Sha256) -> Result<Tree, Error> {
+    fn compute_tree(&self) -> Result<Tree, Error> {
         let mut leaf_count = Self::chunk_count().next_power_of_two();
 
         let decoration = self.decoration();
@@ -221,7 +219,7 @@ pub trait Prove: GeneralizedIndexable {
         let mut tree = Tree::new(&chunks, leaf_count)?;
 
         if let Some(decoration) = decoration {
-            tree.mix_in_decoration(decoration, hasher)?;
+            tree.mix_in_decoration(decoration)?;
         }
 
         Ok(tree)
@@ -290,17 +288,20 @@ pub fn is_valid_merkle_branch(
     }
 
     let mut derived_root = leaf;
-    let mut hasher = Sha256::new();
 
     for (i, node) in branch.iter().enumerate() {
         if (index / 2usize.pow(i as u32)) % 2 != 0 {
-            hasher.update(node);
-            hasher.update(derived_root);
+            // hasher.update(node);
+            // hasher.update(derived_root);
+            let root = derived_root.clone();
+            derived_root.copy_from_slice(&hash32_concat(node.as_slice(), root.as_slice()));
         } else {
-            hasher.update(derived_root);
-            hasher.update(node);
+            // hasher.update(derived_root);
+            // hasher.update(node);
+            let root = derived_root.clone();
+            derived_root.copy_from_slice(&hash32_concat(root.as_slice(), node.as_slice()));
         }
-        derived_root.copy_from_slice(&hasher.finalize_reset());
+        // derived_root.copy_from_slice(&hasher.finalize_reset());
     }
 
     if derived_root == root {
