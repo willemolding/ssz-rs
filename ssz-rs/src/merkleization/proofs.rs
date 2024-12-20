@@ -204,10 +204,14 @@ pub trait Prove: GeneralizedIndexable {
 
         let leaves_and_indices: Vec<_> = indices
             .par_iter()
-            .map(|index| {
+            .enumerate()
+            .map(|(i, index)| {
                 let mut prover = Prover::from(*index);
                 prover
                     .compute_proof_cached_tree(*thread_local_self.get_or(|| self.clone()), &tree)?;
+                if i % 1000 == 0 {
+                    tracing::info!("Computed proof for index {}", i);
+                }
                 Ok((prover.proof.leaf, prover.proof.index, prover.witness))
             })
             .collect::<Result<Vec<_>, Error>>()?;
@@ -218,9 +222,12 @@ pub trait Prove: GeneralizedIndexable {
             witness = w;
         }
 
-        proof.branch.par_extend(helpers.par_iter().map(|helper| {
+        proof.branch.par_extend(helpers.par_iter().enumerate().map(|(i, helper)| {
             let mut prover = Prover::from(*helper);
             prover.compute_proof_cached_tree(self, &tree).unwrap();
+            if i % 1000 == 0 {
+                tracing::info!("Computed proof for helper {}", i);
+            }
             prover.proof.leaf
         }));
 
