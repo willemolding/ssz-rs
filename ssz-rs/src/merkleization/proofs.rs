@@ -193,22 +193,19 @@ pub trait Prove: GeneralizedIndexable {
         Self: Sync,
     {
         use rayon::prelude::*;
-        use thread_local::ThreadLocal;
 
         let helpers = multiproofs::get_helper_indices(&indices);
         let mut proof = MultiProof { leaves: vec![], branch: vec![], indices: vec![] };
         let mut witness: Node = Node::ZERO;
 
         let tree = self.compute_tree()?;
-        let thread_local_self = Arc::new(ThreadLocal::new());
 
         let leaves_and_indices: Vec<_> = indices
             .par_iter()
             .enumerate()
             .map(|(i, index)| {
                 let mut prover = Prover::from(*index);
-                prover
-                    .compute_proof_cached_tree(*thread_local_self.get_or(|| self.clone()), &tree)?;
+                prover.compute_proof_cached_tree(self, &tree)?;
                 if i % 1000 == 0 {
                     tracing::info!("Computed proof for index {}", i);
                 }
