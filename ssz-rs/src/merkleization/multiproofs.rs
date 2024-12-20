@@ -8,7 +8,7 @@ use crate::{
 };
 use ethereum_hashing::hash32_concat;
 
-fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+pub fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     let mut focus = sibling(tree_index);
     let mut result = vec![focus];
     while focus > 1 {
@@ -19,7 +19,7 @@ fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     result
 }
 
-fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
+pub fn get_path_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     let mut focus = tree_index;
     let mut result = vec![focus];
     while focus > 1 {
