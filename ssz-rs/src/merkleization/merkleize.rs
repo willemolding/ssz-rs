@@ -119,12 +119,14 @@ pub(crate) fn elements_to_chunks<'a, T: HashTreeRoot + 'a>(
     Ok(chunks)
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Tree {
     data: Vec<Vec<u8>>,
     depth: usize,
 }
 
 impl Tree {
+    #[tracing::instrument(skip(chunks))]
     pub fn new(chunks: &[u8], leaf_count: usize) -> Result<Tree, Error> {
         let mut leaves = chunks.len() / BYTES_PER_CHUNK;
         let depth = leaf_count.trailing_zeros() as usize + 1;

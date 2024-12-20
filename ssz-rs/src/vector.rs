@@ -8,7 +8,7 @@ use crate::{
         elements_to_chunks, get_power_of_two_ceil, merkleize, pack,
         proofs::{Prove, Prover},
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
-        PathElement,
+        PathElement, Tree,
     },
     ser::{Serialize, SerializeError, Serializer},
     Serializable, SimpleSerialize,
@@ -23,6 +23,8 @@ pub struct Vector<T: Serializable, const N: usize> {
     data: Vec<T>,
     #[serde(skip)]
     chunk_cache: RefCell<Option<Vec<u8>>>,
+    #[serde(skip)]
+    tree_cache: RefCell<Option<Tree>>,
 }
 
 impl<T: Serializable, const N: usize> AsRef<[T]> for Vector<T, N> {
@@ -50,7 +52,7 @@ impl<T: Serializable, const N: usize> TryFrom<Vec<T>> for Vector<T, N> {
             let len = data.len();
             Err((data, Error::Instance(InstanceError::Exact { required: N, provided: len })))
         } else {
-            Ok(Self { data, chunk_cache: RefCell::new(None) })
+            Ok(Self { data, chunk_cache: RefCell::new(None), tree_cache: RefCell::new(None) })
         }
     }
 }
@@ -69,7 +71,11 @@ where
             let len = data.len();
             Err(Error::Instance(InstanceError::Exact { required: N, provided: len }))
         } else {
-            Ok(Self { data: data.to_vec(), chunk_cache: RefCell::new(None) })
+            Ok(Self {
+                data: data.to_vec(),
+                chunk_cache: RefCell::new(None),
+                tree_cache: RefCell::new(None),
+            })
         }
     }
 }
@@ -226,10 +232,10 @@ where
 
     fn assemble_chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
         if let Some(ref chunks) = *self.chunk_cache.borrow() {
-            tracing::debug!("Using cached chunks for List");
+            tracing::debug!("Using cached chunks for Vector");
             return Ok(chunks.clone());
         }
-        tracing::debug!("Cache miss, recomputing cached chunks for List");
+        tracing::debug!("Cache miss, recomputing cached chunks for Vector");
         let chunks = if T::is_composite_type() {
             let count = self.len();
             elements_to_chunks(self.data.iter().enumerate(), count)
@@ -301,6 +307,15 @@ where
             let child = &self[index];
             prover.compute_proof(child)
         }
+    }
+
+    fn cache_tree(&self, tree: Tree) -> Result<(), MerkleizationError> {
+        self.tree_cache.borrow_mut().replace(tree);
+        Ok(())
+    }
+
+    fn fetch_cached_tree(&self) -> Result<Option<crate::merkleization::Tree>, MerkleizationError> {
+        Ok(self.tree_cache.borrow().clone())
     }
 }
 

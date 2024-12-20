@@ -8,7 +8,7 @@ use crate::{
         elements_to_chunks, get_power_of_two_ceil, merkleize, mix_in_length, pack,
         proofs::{Prove, Prover},
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
-        PathElement, BYTES_PER_CHUNK,
+        PathElement, Tree, BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError, Serializer},
     Serializable, SimpleSerialize,
@@ -21,6 +21,8 @@ pub struct List<T: Serializable, const N: usize> {
     data: Vec<T>,
     #[serde(skip)]
     chunk_cache: RefCell<Option<Vec<u8>>>,
+    #[serde(skip)]
+    tree_cache: RefCell<Option<Tree>>,
 }
 
 impl<T: Serializable, const N: usize> AsRef<[T]> for List<T, N> {
@@ -77,7 +79,7 @@ where
             let len = data.len();
             Err((data, Error::Instance(InstanceError::Bounded { bound: N, provided: len })))
         } else {
-            Ok(Self { data, chunk_cache: RefCell::new(None) })
+            Ok(Self { data, chunk_cache: RefCell::new(None), tree_cache: RefCell::new(None) })
         }
     }
 }
@@ -93,7 +95,11 @@ where
             let len = data.len();
             Err(Error::Instance(InstanceError::Bounded { bound: N, provided: len }))
         } else {
-            Ok(Self { data: data.to_vec(), chunk_cache: RefCell::new(None) })
+            Ok(Self {
+                data: data.to_vec(),
+                chunk_cache: RefCell::new(None),
+                tree_cache: RefCell::new(None),
+            })
         }
     }
 }
@@ -305,6 +311,15 @@ where
 
     fn decoration(&self) -> Option<usize> {
         Some(self.len())
+    }
+
+    fn cache_tree(&self, tree: Tree) -> Result<(), MerkleizationError> {
+        self.tree_cache.borrow_mut().replace(tree);
+        Ok(())
+    }
+
+    fn fetch_cached_tree(&self) -> Result<Option<crate::merkleization::Tree>, MerkleizationError> {
+        Ok(self.tree_cache.borrow().clone())
     }
 }
 

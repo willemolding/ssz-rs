@@ -65,6 +65,7 @@ impl Prover {
     }
 
     /// Derive a Merkle proof relative to `data` given the parameters in `self`.
+    #[tracing::instrument(skip(self, data))]
     pub fn compute_proof<T: Prove + ?Sized>(&mut self, data: &T) -> Result<(), Error> {
         let tree = data.compute_tree()?;
         self.compute_proof_cached_tree(data, &tree)
@@ -189,40 +190,63 @@ pub trait Prove: GeneralizedIndexable {
 
         let tree = self.compute_tree()?;
 
-        for index in indices.iter() {
+        for (i, index) in indices.iter().enumerate() {
             let mut prover = Prover::from(*index);
             prover.compute_proof_cached_tree(self, &tree)?;
+            if i % 1000 == 0 {
+                tracing::info!("completed proof for index {}/{}", i, indices.len());
+            }
             proof.leaves.push(prover.proof.leaf);
             proof.indices.push(prover.proof.index);
             witness = prover.witness;
         }
 
-        for helper in helpers.iter() {
+        for (i, helper) in helpers.iter().enumerate() {
             let mut prover = Prover::from(*helper);
             prover.compute_proof_cached_tree(self, &tree)?;
+            if i % 1000 == 0 {
+                tracing::info!("completed proof for index {}/{}", i, helpers.len());
+            }
             proof.branch.push(prover.proof.leaf);
         }
 
         Ok((proof, witness))
     }
 
+    #[tracing::instrument(skip(self))]
     fn compute_tree(&self) -> Result<Tree, Error> {
-        let mut leaf_count = Self::chunk_count().next_power_of_two();
+        if let Some(tree) = self.fetch_cached_tree()? {
+            tracing::debug!("Using cached tree");
+            Ok(tree)
+        } else {
+            tracing::debug!("Cache miss, recomputing tree");
 
-        let decoration = self.decoration();
-        if decoration.is_some() {
-            // double to account for decoration layer
-            leaf_count *= 2;
+            let mut leaf_count = Self::chunk_count().next_power_of_two();
+
+            let decoration = self.decoration();
+            if decoration.is_some() {
+                // double to account for decoration layer
+                leaf_count *= 2;
+            }
+
+            let chunks = self.chunks()?;
+            let mut tree = Tree::new(&chunks, leaf_count)?;
+
+            if let Some(decoration) = decoration {
+                tree.mix_in_decoration(decoration)?;
+            }
+
+            self.cache_tree(tree.clone())?;
+            Ok(tree)
         }
+    }
 
-        let chunks = self.chunks()?;
-        let mut tree = Tree::new(&chunks, leaf_count)?;
+    fn fetch_cached_tree(&self) -> Result<Option<Tree>, Error> {
+        Ok(None)
+    }
 
-        if let Some(decoration) = decoration {
-            tree.mix_in_decoration(decoration)?;
-        }
-
-        Ok(tree)
+    fn cache_tree(&self, tree: Tree) -> Result<(), Error> {
+        Ok(())
     }
 }
 
