@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::sync::{Arc, RwLock};
 
 use crate::{
     de::{deserialize_homogeneous_composite, Deserialize, DeserializeError},
@@ -17,14 +17,26 @@ use crate::{
 /// A homogenous collection of a fixed number of values.
 ///
 /// NOTE: a `Vector` of length `0` is illegal.
-#[derive(PartialOrd, Ord, Clone)]
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
 pub struct Vector<T: Serializable, const N: usize> {
     data: Vec<T>,
     #[serde(skip)]
-    chunk_cache: RefCell<Option<Vec<u8>>>,
+    chunk_cache: Arc<RwLock<Option<Vec<u8>>>>,
     #[serde(skip)]
-    tree_cache: RefCell<Option<Tree>>,
+    tree_cache: Arc<RwLock<Option<Tree>>>,
+}
+
+impl<T: Serializable + PartialOrd, const N: usize> PartialOrd for Vector<T, N> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.data.partial_cmp(&other.data)
+    }
+}
+
+impl<T: Serializable + Ord, const N: usize> Ord for Vector<T, N> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.data.cmp(&other.data)
+    }
 }
 
 impl<T: Serializable, const N: usize> AsRef<[T]> for Vector<T, N> {
@@ -52,7 +64,11 @@ impl<T: Serializable, const N: usize> TryFrom<Vec<T>> for Vector<T, N> {
             let len = data.len();
             Err((data, Error::Instance(InstanceError::Exact { required: N, provided: len })))
         } else {
-            Ok(Self { data, chunk_cache: RefCell::new(None), tree_cache: RefCell::new(None) })
+            Ok(Self {
+                data,
+                chunk_cache: Arc::new(RwLock::new(None)),
+                tree_cache: Arc::new(RwLock::new(None)),
+            })
         }
     }
 }
@@ -73,8 +89,8 @@ where
         } else {
             Ok(Self {
                 data: data.to_vec(),
-                chunk_cache: RefCell::new(None),
-                tree_cache: RefCell::new(None),
+                chunk_cache: Arc::new(RwLock::new(None)),
+                tree_cache: Arc::new(RwLock::new(None)),
             })
         }
     }
@@ -231,7 +247,7 @@ where
     // }
 
     fn assemble_chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
-        if let Some(ref chunks) = *self.chunk_cache.borrow() {
+        if let Some(ref chunks) = *self.chunk_cache.read().unwrap() {
             tracing::debug!("Using cached chunks for Vector");
             return Ok(chunks.clone());
         }
@@ -242,7 +258,7 @@ where
         } else {
             pack(self)
         }?;
-        self.chunk_cache.borrow_mut().replace(chunks.clone());
+        self.chunk_cache.write().unwrap().replace(chunks.clone());
         Ok(chunks)
     }
 
@@ -310,12 +326,12 @@ where
     }
 
     fn cache_tree(&self, tree: Tree) -> Result<(), MerkleizationError> {
-        self.tree_cache.borrow_mut().replace(tree);
+        self.tree_cache.write().unwrap().replace(tree);
         Ok(())
     }
 
     fn fetch_cached_tree(&self) -> Result<Option<crate::merkleization::Tree>, MerkleizationError> {
-        Ok(self.tree_cache.borrow().clone())
+        Ok(self.tree_cache.read().unwrap().clone())
     }
 }
 

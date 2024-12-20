@@ -1,4 +1,6 @@
 //! Support for constructing and verifying Merkle proofs.
+use std::sync::Arc;
+
 pub use crate::merkleization::generalized_index::log_2;
 use crate::{
     lib::*,
@@ -174,7 +176,10 @@ pub trait Prove: GeneralizedIndexable {
 
     /// Compute a Multi Merkle proof of `Self` at the type's `paths`, along with the root of the
     /// Merkle tree as a witness value.
-    fn multi_prove(&self, paths: &[Path]) -> Result<(MultiProof, Node), Error> {
+    fn multi_prove(&self, paths: &[Path]) -> Result<(MultiProof, Node), Error>
+    where
+        Self: Sync,
+    {
         let indices: Vec<GeneralizedIndex> =
             paths.iter().map(|x| Self::generalized_index(x).unwrap()).collect();
         self.multi_prove_gindices(&indices)
@@ -183,32 +188,41 @@ pub trait Prove: GeneralizedIndexable {
     fn multi_prove_gindices(
         &self,
         indices: &[GeneralizedIndex],
-    ) -> Result<(MultiProof, Node), Error> {
+    ) -> Result<(MultiProof, Node), Error>
+    where
+        Self: Sync,
+    {
+        use rayon::prelude::*;
+        use thread_local::ThreadLocal;
+
         let helpers = multiproofs::get_helper_indices(&indices);
         let mut proof = MultiProof { leaves: vec![], branch: vec![], indices: vec![] };
         let mut witness: Node = Node::ZERO;
 
         let tree = self.compute_tree()?;
+        let thread_local_self = Arc::new(ThreadLocal::new());
 
-        for (i, index) in indices.iter().enumerate() {
-            let mut prover = Prover::from(*index);
-            prover.compute_proof_cached_tree(self, &tree)?;
-            if i % 1000 == 0 {
-                tracing::info!("completed proof for index {}/{}", i, indices.len());
-            }
-            proof.leaves.push(prover.proof.leaf);
-            proof.indices.push(prover.proof.index);
-            witness = prover.witness;
+        let leaves_and_indices: Vec<_> = indices
+            .par_iter()
+            .map(|index| {
+                let mut prover = Prover::from(*index);
+                prover
+                    .compute_proof_cached_tree(*thread_local_self.get_or(|| self.clone()), &tree)?;
+                Ok((prover.proof.leaf, prover.proof.index, prover.witness))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        for (leaf, index, w) in leaves_and_indices {
+            proof.leaves.push(leaf);
+            proof.indices.push(index);
+            witness = w;
         }
 
-        for (i, helper) in helpers.iter().enumerate() {
+        proof.branch.par_extend(helpers.par_iter().map(|helper| {
             let mut prover = Prover::from(*helper);
-            prover.compute_proof_cached_tree(self, &tree)?;
-            if i % 1000 == 0 {
-                tracing::info!("completed proof for index {}/{}", i, helpers.len());
-            }
-            proof.branch.push(prover.proof.leaf);
-        }
+            prover.compute_proof_cached_tree(self, &tree).unwrap();
+            prover.proof.leaf
+        }));
 
         Ok((proof, witness))
     }
