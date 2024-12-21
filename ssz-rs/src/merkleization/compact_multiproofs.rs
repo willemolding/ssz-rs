@@ -6,7 +6,7 @@ use crate::{
         GeneralizedIndex, MerkleizationError as Error, Node,
     },
 };
-use bitvec::prelude::*;
+use bitvec::{index, prelude::*};
 use sha2::{Digest, Sha256};
 
 pub type Descriptor = BitVec<u8, Msb0>;
@@ -18,6 +18,8 @@ pub fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedInd
         for helper_index in helper_indices {
             indices_set.insert(helper_index);
         }
+    }
+    for &index in indices {
         let path_indices = get_path_indices(index);
         for path_index in path_indices {
             indices_set.remove(&path_index);

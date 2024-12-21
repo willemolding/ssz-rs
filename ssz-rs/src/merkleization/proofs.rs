@@ -3,7 +3,7 @@ use core::default;
 
 pub use crate::merkleization::generalized_index::log_2;
 use crate::{
-    compact_multiproofs,
+    compact_multiproofs::{self, Descriptor},
     lib::*,
     merkleization::{
         multiproofs, GeneralizedIndex, GeneralizedIndexable, MerkleizationError as Error, Node,
@@ -253,31 +253,24 @@ pub trait Prove: GeneralizedIndexable {
         use rayon::prelude::*;
 
         let proof_indices = compact_multiproofs::compute_proof_indices(&indices);
-        let mut proof =
-            CompactMultiProof { nodes: Vec::new(), descriptor: std::default::Default::default() };
-        let mut witness: Node = Node::ZERO;
 
         let tree = self.compute_tree()?;
 
-        let leaves_and_indices: Vec<_> = proof_indices
-            .par_iter()
+        let nodes: Vec<_> = proof_indices
+            .iter()
             .enumerate()
             .map(|(i, index)| {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(self, &tree)?;
-                if i % 1000 == 0 {
-                    tracing::info!("Computed proof for index {}", i);
-                }
-                Ok((prover.proof.leaf, prover.proof.index, prover.witness))
+                Ok(prover.proof.leaf)
             })
             .collect::<Result<Vec<_>, Error>>()?;
 
-        for (leaf, index, w) in leaves_and_indices {
-            proof.nodes.push(leaf);
-            witness = w;
-        }
+        let witness = Node::from_slice(&tree[1]);
 
-        Ok((proof, witness))
+        let descriptor = compact_multiproofs::compute_proof_descriptor(&indices)?;
+
+        Ok((CompactMultiProof { nodes, descriptor, proof_indices }, witness))
     }
 
     #[tracing::instrument(skip(self))]
@@ -341,6 +334,7 @@ impl MultiProof {
 pub struct CompactMultiProof {
     pub nodes: Vec<Node>,
     pub descriptor: compact_multiproofs::Descriptor,
+    pub proof_indices: Vec<GeneralizedIndex>, // TODO: Delete this, just using for testing
 }
 
 impl CompactMultiProof {
@@ -526,7 +520,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_generate_multi_proofs() {
+    fn test_generate_multi_proofs() -> Result<(), Error> {
         #[derive(PartialEq, Eq, Debug, Default, SimpleSerialize)]
         struct TestContainer {
             a: u64,
@@ -540,26 +534,14 @@ pub(crate) mod tests {
         };
 
         let (proof, witness) =
-            data.multi_prove(&[&["a".into()], &["b".into(), 0.into()], &["c".into()]]).unwrap();
-        assert!(proof.verify(witness).is_ok());
-    }
+            data.multi_prove(&[&["a".into()], &["b".into(), 0.into()], &["c".into()]])?;
 
-    #[test]
-    fn test_compact_multi_proofs() {
-        #[derive(PartialEq, Eq, Debug, Default, SimpleSerialize)]
-        struct TestContainer {
-            a: u64,
-            b: List<u8, 16>,
-            c: u8,
-        }
-        let data = TestContainer {
-            a: 18745094,
-            b: List::<u8, 16>::try_from(vec![200, 50, 40, 80]).unwrap(),
-            c: 240,
-        };
+        let (compact_proof, compact_witness) =
+            data.compact_multi_prove(&[&["a".into()], &["b".into(), 0.into()], &["c".into()]])?;
 
-        let (proof, witness) =
-            data.multi_prove(&[&["a".into()], &["b".into(), 0.into()], &["c".into()]]).unwrap();
-        assert!(proof.verify(witness).is_ok());
+        assert_eq!(witness, compact_witness);
+        proof.verify(witness)?;
+        compact_proof.verify(compact_witness)?;
+        Ok(())
     }
 }
