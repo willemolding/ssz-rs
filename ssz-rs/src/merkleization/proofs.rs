@@ -1,8 +1,9 @@
 //! Support for constructing and verifying Merkle proofs.
-use std::sync::Arc;
+use core::default;
 
 pub use crate::merkleization::generalized_index::log_2;
 use crate::{
+    compact_multiproofs,
     lib::*,
     merkleization::{
         multiproofs, GeneralizedIndex, GeneralizedIndexable, MerkleizationError as Error, Node,
@@ -231,6 +232,54 @@ pub trait Prove: GeneralizedIndexable {
         Ok((proof, witness))
     }
 
+    /// Compute a Multi Merkle proof of `Self` at the type's `paths`, along with the root of the
+    /// Merkle tree as a witness value.
+    fn compact_multi_prove(&self, paths: &[Path]) -> Result<(CompactMultiProof, Node), Error>
+    where
+        Self: Sync,
+    {
+        let indices: Vec<GeneralizedIndex> =
+            paths.iter().map(|x| Self::generalized_index(x).unwrap()).collect();
+        self.compact_multi_prove_gindices(&indices)
+    }
+
+    fn compact_multi_prove_gindices(
+        &self,
+        indices: &[GeneralizedIndex],
+    ) -> Result<(CompactMultiProof, Node), Error>
+    where
+        Self: Sync,
+    {
+        use rayon::prelude::*;
+
+        let proof_indices = compact_multiproofs::compute_proof_indices(&indices);
+        let mut proof =
+            CompactMultiProof { nodes: Vec::new(), descriptor: std::default::Default::default() };
+        let mut witness: Node = Node::ZERO;
+
+        let tree = self.compute_tree()?;
+
+        let leaves_and_indices: Vec<_> = proof_indices
+            .par_iter()
+            .enumerate()
+            .map(|(i, index)| {
+                let mut prover = Prover::from(*index);
+                prover.compute_proof_cached_tree(self, &tree)?;
+                if i % 1000 == 0 {
+                    tracing::info!("Computed proof for index {}", i);
+                }
+                Ok((prover.proof.leaf, prover.proof.index, prover.witness))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        for (leaf, index, w) in leaves_and_indices {
+            proof.nodes.push(leaf);
+            witness = w;
+        }
+
+        Ok((proof, witness))
+    }
+
     #[tracing::instrument(skip(self))]
     fn compute_tree(&self) -> Result<Tree, Error> {
         if let Some(tree) = self.fetch_cached_tree()? {
@@ -283,6 +332,23 @@ impl MultiProof {
     /// See `Prover` for further information.
     pub fn verify(&self, root: Node) -> Result<(), Error> {
         multiproofs::verify_merkle_multiproof(&self.leaves, &self.branch, &self.indices, root)
+    }
+}
+
+/// Contains data necessary to verify `leaf` was included under some witness "root" node
+/// at the generalized position `index`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct CompactMultiProof {
+    pub nodes: Vec<Node>,
+    pub descriptor: compact_multiproofs::Descriptor,
+}
+
+impl CompactMultiProof {
+    /// Verify `self` against the provided `root` witness node.
+    /// This `root` is the hash tree root of the SSZ object that produced the proof.
+    /// See `Prover` for further information.
+    pub fn verify(&self, root: Node) -> Result<(), Error> {
+        compact_multiproofs::verify_compact_merkle_multiproof(&self.nodes, &self.descriptor, root)
     }
 }
 
@@ -461,6 +527,25 @@ pub(crate) mod tests {
 
     #[test]
     fn test_generate_multi_proofs() {
+        #[derive(PartialEq, Eq, Debug, Default, SimpleSerialize)]
+        struct TestContainer {
+            a: u64,
+            b: List<u8, 16>,
+            c: u8,
+        }
+        let data = TestContainer {
+            a: 18745094,
+            b: List::<u8, 16>::try_from(vec![200, 50, 40, 80]).unwrap(),
+            c: 240,
+        };
+
+        let (proof, witness) =
+            data.multi_prove(&[&["a".into()], &["b".into(), 0.into()], &["c".into()]]).unwrap();
+        assert!(proof.verify(witness).is_ok());
+    }
+
+    #[test]
+    fn test_compact_multi_proofs() {
         #[derive(PartialEq, Eq, Debug, Default, SimpleSerialize)]
         struct TestContainer {
             a: u64,

@@ -6,9 +6,12 @@ use crate::{
         GeneralizedIndex, MerkleizationError as Error, Node,
     },
 };
+use bitvec::prelude::*;
 use sha2::{Digest, Sha256};
 
-fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
+pub type Descriptor = BitVec<u8, Msb0>;
+
+pub fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> {
     let mut indices_set: HashSet<GeneralizedIndex> = HashSet::new();
     for &index in indices {
         let helper_indices = get_helper_indices(&[index]);
@@ -26,68 +29,14 @@ fn compute_proof_indices(indices: &[GeneralizedIndex]) -> Vec<GeneralizedIndex> 
     sorted_indices
 }
 
-pub fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<Vec<u8>, Error> {
+pub fn compute_proof_descriptor(indices: &[GeneralizedIndex]) -> Result<BitVec<u8, Msb0>, Error> {
     let indices = compute_proof_indices(indices);
-    let mut bitstring = String::new();
-    for &index in &indices {
-        let bin_str = format!("{:b}", index);
-        let zeros = bin_str.len() - bin_str.trim_end_matches('0').len();
-        bitstring.push_str(&"0".repeat(zeros));
-        bitstring.push('1');
+    let mut descriptor = BitVec::<u8, Msb0>::new();
+    for index in indices {
+        descriptor.extend(std::iter::repeat(false).take(index.trailing_zeros() as usize));
+        descriptor.push(true);
     }
-    if bitstring.len() % 8 != 0 {
-        let additional_bits = 8 - (bitstring.len() % 8);
-        bitstring.push_str(&"0".repeat(additional_bits));
-    }
-
-    if let Ok(num) = usize::from_str_radix(&bitstring, 2) {
-        let bytes = num.to_be_bytes();
-        let significant_bytes = (bitstring.len() + 7) / 8;
-        Ok(bytes[bytes.len() - significant_bytes..].to_vec())
-    } else {
-        Err(Error::InvalidDescriptor(bitstring))
-    }
-}
-
-fn compute_bits_from_proof_descriptor(descriptor: &[u8]) -> Result<Vec<bool>, Error> {
-    // Convert bytes to a continuous bit string
-    let bitstring: Vec<bool> = descriptor
-        .iter()
-        .flat_map(|&byte| (0..8).rev().map(move |i| (byte >> i) & 1 == 1))
-        .collect();
-
-    // Find the last '1' in the bitstring
-    let last_one_index = bitstring
-        .iter()
-        .rposition(|&bit| bit)
-        .ok_or(Error::InvalidDescriptor("Descriptor does not contain any '1' bits".to_string()))?;
-
-    // Ensure the padding after the last '1' is within the acceptable range
-    if bitstring.len() - last_one_index > 8 {
-        return Err(Error::InvalidDescriptor(
-            "Invalid proof descriptor: padding after the last '1' exceeds 8 bits".to_string(),
-        ));
-    }
-
-    // Calculate the bit balance and check conditions
-    let mut count_0_vs_1 = 0;
-    let mut bits = Vec::new();
-
-    for (i, &bit) in bitstring.iter().enumerate().take(last_one_index + 1) {
-        bits.push(bit);
-        if bit {
-            count_0_vs_1 -= 1;
-        } else {
-            count_0_vs_1 += 1;
-        }
-
-        // Check mismatch condition at the last index
-        if (count_0_vs_1 < 0) != (i == last_one_index) {
-            return Err(Error::InvalidIndexBalanceInDescriptor);
-        }
-    }
-
-    Ok(bits)
+    Ok(descriptor)
 }
 
 struct Pointer {
@@ -95,11 +44,13 @@ struct Pointer {
     node_index: usize,
 }
 
-fn calculate_compact_multi_merkle_root(nodes: &[Node], descriptor: &[u8]) -> Result<Node, Error> {
-    let bits = compute_bits_from_proof_descriptor(descriptor)?;
+pub fn calculate_compact_multi_merkle_root(
+    nodes: &[Node],
+    descriptor: &BitVec<u8, Msb0>,
+) -> Result<Node, Error> {
     let mut ptr = Pointer { bit_index: 0, node_index: 0 };
-    let root = calculate_compact_multi_merkle_root_inner(nodes, &bits, &mut ptr)?;
-    if ptr.bit_index != bits.len() || ptr.node_index != nodes.len() {
+    let root = calculate_compact_multi_merkle_root_inner(nodes, &descriptor, &mut ptr)?;
+    if ptr.bit_index != descriptor.len() || ptr.node_index != nodes.len() {
         Err(Error::InvalidProof)
     } else {
         Ok(root)
@@ -108,30 +59,25 @@ fn calculate_compact_multi_merkle_root(nodes: &[Node], descriptor: &[u8]) -> Res
 
 fn calculate_compact_multi_merkle_root_inner(
     nodes: &[Node],
-    bits: &[bool],
+    descriptor: &BitVec<u8, Msb0>,
     ptr: &mut Pointer,
 ) -> Result<Node, Error> {
-    let bit = bits[ptr.bit_index];
+    let bit = descriptor[ptr.bit_index];
     ptr.bit_index += 1;
     if bit {
         let node = nodes[ptr.node_index];
         ptr.node_index += 1;
         Ok(node)
     } else {
-        let left = calculate_compact_multi_merkle_root_inner(nodes, bits, ptr)?;
-        let right = calculate_compact_multi_merkle_root_inner(nodes, bits, ptr)?;
-        let mut result = left;
-        let mut hasher = Sha256::new();
-        hasher.update(left);
-        hasher.update(right);
-        result.copy_from_slice(&hasher.finalize_reset());
-        Ok(result)
+        let left = calculate_compact_multi_merkle_root_inner(nodes, descriptor, ptr)?;
+        let right = calculate_compact_multi_merkle_root_inner(nodes, descriptor, ptr)?;
+        Ok(hash_pair(&left, &right))
     }
 }
 
 pub fn verify_compact_merkle_multiproof(
     nodes: &[Node],
-    descriptor: &[u8],
+    descriptor: &BitVec<u8, Msb0>,
     root: Node,
 ) -> Result<(), Error> {
     if calculate_compact_multi_merkle_root(nodes, descriptor)? == root {
@@ -141,6 +87,13 @@ pub fn verify_compact_merkle_multiproof(
     }
 }
 
+fn hash_pair(left: &Node, right: &Node) -> Node {
+    let mut hasher = Sha256::new();
+    hasher.update(left);
+    hasher.update(right);
+    Node::from_slice(hasher.finalize().as_slice())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,12 +101,18 @@ mod tests {
 
     #[test]
     fn test_compute_proof_descriptor() {
-        assert_eq!(compute_proof_descriptor(&[42]).expect("can make descriptor"), vec![0x25, 0xe0]);
         assert_eq!(
-            compute_proof_descriptor(&[5567]).expect("can make descriptor"),
-            vec![0x25, 0x2a, 0xaf, 0x80]
+            compute_proof_descriptor(&[42]).expect("can make descriptor").into_vec(),
+            vec![0x25_u8, 0xe0_u8]
         );
-        assert_eq!(compute_proof_descriptor(&[66]).expect("can make descriptor"), vec![0x5, 0xf8]);
+        assert_eq!(
+            compute_proof_descriptor(&[5567]).expect("can make descriptor").into_vec(),
+            vec![0x25_u8, 0x2a_u8, 0xaf_u8, 0x80_u8]
+        );
+        assert_eq!(
+            compute_proof_descriptor(&[66]).expect("can make descriptor").into_vec(),
+            vec![0x5_u8, 0xf8_u8]
+        );
     }
 
     #[test]
