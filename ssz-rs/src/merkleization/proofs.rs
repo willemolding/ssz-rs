@@ -125,6 +125,10 @@ impl Prover {
 
         Ok(())
     }
+
+    pub fn into_proof(self) -> Proof {
+        self.proof
+    }
 }
 
 impl From<Prover> for ProofAndWitness {
@@ -250,16 +254,13 @@ pub trait Prove: GeneralizedIndexable {
     where
         Self: Sync,
     {
-        use rayon::prelude::*;
-
         let proof_indices = compact_multiproofs::compute_proof_indices(&indices);
 
         let tree = self.compute_tree()?;
 
         let nodes: Vec<_> = proof_indices
             .iter()
-            .enumerate()
-            .map(|(i, index)| {
+            .map(|index| {
                 let mut prover = Prover::from(*index);
                 prover.compute_proof_cached_tree(self, &tree)?;
                 Ok(prover.proof.leaf)
@@ -270,7 +271,7 @@ pub trait Prove: GeneralizedIndexable {
 
         let descriptor = compact_multiproofs::compute_proof_descriptor(&indices)?;
 
-        Ok((CompactMultiProof { nodes, descriptor, proof_indices }, witness))
+        Ok((CompactMultiProof { nodes, descriptor }, witness))
     }
 
     #[tracing::instrument(skip(self))]
@@ -334,7 +335,6 @@ impl MultiProof {
 pub struct CompactMultiProof {
     pub nodes: Vec<Node>,
     pub descriptor: compact_multiproofs::Descriptor,
-    pub proof_indices: Vec<GeneralizedIndex>, // TODO: Delete this, just using for testing
 }
 
 impl CompactMultiProof {
@@ -393,17 +393,12 @@ pub fn is_valid_merkle_branch(
 
     for (i, node) in branch.iter().enumerate() {
         if (index / 2usize.pow(i as u32)) % 2 != 0 {
-            // hasher.update(node);
-            // hasher.update(derived_root);
             let root = derived_root.clone();
             derived_root.copy_from_slice(&hash32_concat(node.as_slice(), root.as_slice()));
         } else {
-            // hasher.update(derived_root);
-            // hasher.update(node);
             let root = derived_root.clone();
             derived_root.copy_from_slice(&hash32_concat(root.as_slice(), node.as_slice()));
         }
-        // derived_root.copy_from_slice(&hasher.finalize_reset());
     }
 
     if derived_root == root {
