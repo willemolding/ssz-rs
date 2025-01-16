@@ -135,9 +135,9 @@ where
     T: SimpleSerialize + Visitable<V>,
     V: Visitor,
 {
-    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), visitor::Error> {
+    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         if index >= 2 {
-            Err(visitor::Error::InvalidInnerIndex)
+            Err(visitor::Error::InvalidInnerIndex.into())
         } else {
             match self {
                 Some(value) => visitor.visit(value),

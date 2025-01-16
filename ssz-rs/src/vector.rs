@@ -272,9 +272,9 @@ where
     T: SimpleSerialize + Visitable<V>,
     V: Visitor,
 {
-    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), visitor::Error> {
+    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         if index >= N {
-            Err(visitor::Error::InvalidInnerIndex)
+            Err(visitor::Error::InvalidInnerIndex.into())
         } else {
             let child = &self[index];
             visitor.visit(child)

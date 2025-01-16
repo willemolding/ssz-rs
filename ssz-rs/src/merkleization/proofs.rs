@@ -7,6 +7,7 @@ use crate::{
         Node, Path,
     },
     visitor::{self, Visitable, Visitor},
+    SimpleSerialize,
 };
 use sha2::{Digest, Sha256};
 
@@ -119,7 +120,12 @@ impl Prover {
 }
 
 impl Visitor for Prover {
-    fn visit<T: Visitable<Self> + ?Sized>(&mut self, data: &T) -> Result<(), visitor::Error> {
+    type Error = Error;
+
+    fn visit<T: SimpleSerialize + Visitable<Self> + ?Sized>(
+        &mut self,
+        data: &T,
+    ) -> Result<(), Self::Error> {
         let chunk_count = T::chunk_count();
         let mut leaf_count = chunk_count.next_power_of_two();
         let parent_index = self.proof.index;
