@@ -157,16 +157,20 @@ pub trait Chunkable: GeneralizedIndexable {
     fn decoration(&self) -> Option<usize> {
         None
     }
-
-    // /// Compute a Merkle proof of `Self` at the type's `path`, along with the root of the Merkle
-    // /// tree as a witness value.
-    // fn prove(&self, path: Path) -> Result<ProofAndWitness, Error> {
-    //     let index = Self::generalized_index(path)?;
-    //     let mut prover = Prover::from(index);
-    //     prover.compute_proof(self)?;
-    //     Ok(prover.into())
-    // }
 }
+
+trait Prove: SimpleSerialize {
+    /// Compute a Merkle proof of `Self` at the type's `path`, along with the root of the Merkle
+    /// tree as a witness value.
+    fn prove(&self, path: Path) -> Result<ProofAndWitness, Error> {
+        let index = Self::generalized_index(path)?;
+        let mut prover = Prover::from(index);
+        prover.visit(self)?;
+        Ok(prover.into())
+    }
+}
+
+impl<T> Prove for T where T: SimpleSerialize {}
 
 /// Contains data necessary to verify `leaf` was included under some witness "root" node
 /// at the generalized position `index`.
