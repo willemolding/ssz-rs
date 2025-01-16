@@ -2,12 +2,12 @@ use crate::SimpleSerialize;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
-pub enum Error {
+pub enum VisitorError {
     NoInnerElement,
     InvalidInnerIndex,
 }
 
-impl Display for Error {
+impl Display for VisitorError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::NoInnerElement => write!(
@@ -24,12 +24,12 @@ impl Display for Error {
 
 pub trait Visitable {
     fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
-        Err(Error::NoInnerElement.into())
+        Err(VisitorError::NoInnerElement.into())
     }
 }
 
 pub trait Visitor: Sized {
-    type Error: From<Error>;
+    type Error: From<VisitorError>;
 
     fn visit<T: SimpleSerialize + Visitable + ?Sized>(
         &mut self,

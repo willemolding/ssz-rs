@@ -37,7 +37,7 @@ pub enum MerkleizationError {
     /// Attempt to turn an instance of a type in Merkle chunks when this is not supported
     NotChunkable,
     /// Error encountered while traversing the SSZ type
-    Visitor(visitor::Error),
+    Visitor(visitor::VisitorError),
 }
 
 impl From<SerializeError> for MerkleizationError {
@@ -46,8 +46,8 @@ impl From<SerializeError> for MerkleizationError {
     }
 }
 
-impl From<visitor::Error> for MerkleizationError {
-    fn from(err: visitor::Error) -> Self {
+impl From<visitor::VisitorError> for MerkleizationError {
+    fn from(err: visitor::VisitorError) -> Self {
         MerkleizationError::Visitor(err)
     }
 }

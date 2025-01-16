@@ -9,7 +9,7 @@ use crate::{
         PathElement, BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError, Serializer},
-    visitor::{self, Visitable, Visitor},
+    visitor::{self, Visitable, Visitor, VisitorError},
     Serializable, SimpleSerialize,
 };
 
@@ -282,7 +282,7 @@ where
 {
     fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         if index >= N {
-            Err(visitor::Error::InvalidInnerIndex.into())
+            Err(visitor::VisitorError::InvalidInnerIndex.into())
         } else {
             let child = &self[index];
             visitor.visit(child)

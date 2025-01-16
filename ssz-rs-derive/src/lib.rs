@@ -115,7 +115,7 @@ fn derive_deserialize_impl(data: &Data, helper_attr: Option<&HelperAttr>) -> Tok
                             let result = <#field_type>::deserialize(&encoding)?;
                             Ok(Self(result))
                         }
-                    }
+                    };
                 }
                 _ => unimplemented!(
                     "this type of struct is currently not supported by this derive macro"
@@ -588,7 +588,7 @@ fn derive_generalized_indexable_impl(
     }
 }
 
-fn derive_prove_impl(data: &Data, name: &Ident, generics: &Generics) -> TokenStream {
+fn derive_chunkable_impl(data: &Data, name: &Ident, generics: &Generics) -> TokenStream {
     let (impl_generics, ty_generics, _) = generics.split_for_impl();
 
     let (chunks_impl, prove_element_impl, decoration_impl) = match data {
@@ -705,20 +705,104 @@ fn derive_prove_impl(data: &Data, name: &Ident, generics: &Generics) -> TokenStr
     };
 
     quote! {
-        impl #impl_generics ssz_rs::Prove for #name #ty_generics {
+        impl #impl_generics ssz_rs::Chunkable for #name #ty_generics {
             fn chunks(&self) -> Result<Vec<u8>, ssz_rs::MerkleizationError> {
                 #chunks_impl
             }
 
-            fn prove_element(
+            #decoration_impl
+        }
+    }
+}
+
+fn derive_visitable_impl(data: &Data, name: &Ident, generics: &Generics) -> TokenStream {
+    let (impl_generics, ty_generics, _) = generics.split_for_impl();
+
+    let visit_element_impl = match data {
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => {
+                let fields = &fields.named;
+                let field_count = fields.len();
+                let impl_by_field = fields.iter().enumerate().map(|(i, field)| {
+                    let field_name = field.ident.as_ref().expect("only named fields");
+                    quote! {
+                         #i => {
+                            let child = &self.#field_name;
+                            visitor.visit(child)
+                        }
+                    }
+                });
+
+                quote! {
+                    if index >= #field_count {
+                        Err(ssz_rs::VisitorError::InvalidInnerIndex.into())
+                    } else {
+                        match index {
+                            #(#impl_by_field)*
+                            _ => unreachable!("validated `index` to be within container type"),
+                        }
+                    }
+                }
+            }
+            Fields::Unnamed(..) => {
+                // NOTE: new type pattern, proxy to wrapped type...
+                quote! {
+                    self.0.visit_element(index, visitor)
+                }
+            }
+            Fields::Unit => unreachable!("validated to exclude this type"),
+        },
+        Data::Enum(ref data) => {
+            let variant_count = data.variants.len();
+
+            let impl_by_variant = data.variants.iter().enumerate().map(|(i, variant)| {
+                let variant_name = &variant.ident;
+                match &variant.fields {
+                    Fields::Unnamed(..) => {
+                        quote! {
+                            Self::#variant_name(value) => visitor.visit(value),
+                        }
+                    }
+                    Fields::Unit => {
+                        // NOTE: this has already been validated to conform to:
+                        // first variant, and is `None` identifier
+                        if i != 0 || !is_valid_none_identifier(variant_name) {
+                            panic!("internal validation inconsistency; check proc derive macro");
+                        }
+
+                        quote! {
+                            Self::None => {
+                                let leaf = 0usize;
+                                visitor.visit(&leaf)
+                            }
+                        }
+                    }
+                    _ => unreachable!("other variants validated to not exist"),
+                }
+            });
+
+            quote! {
+                if index >= #variant_count {
+                    Err(ssz_rs::VisitorError::InvalidInnerIndex.into())
+                } else {
+                    match self {
+                        #(#impl_by_variant)*
+                    }
+                }
+            }
+        }
+        Data::Union(..) => unreachable!("data was already validated to exclude union types"),
+    };
+
+    quote! {
+        impl #impl_generics ssz_rs::Visitable for #name #ty_generics {
+            fn visit_element<V: ssz_rs::Visitor>(
                 &self,
                 index: usize,
-                prover: &mut ssz_rs::proofs::Prover,
-            ) -> Result<(), ssz_rs::MerkleizationError> {
-                #prove_element_impl
+                visitor: &mut V,
+            ) -> Result<(), V::Error> {
+                #visit_element_impl
             }
-
-            #decoration_impl
         }
     }
 }
@@ -976,9 +1060,9 @@ pub fn derive_generalized_indexable(input: proc_macro::TokenStream) -> proc_macr
     proc_macro::TokenStream::from(expansion)
 }
 
-/// Derive an implementation of the `Prove` trait to support Merkle proofs.
-#[proc_macro_derive(Prove)]
-pub fn derive_prove(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+/// Derive an implementation of the `Chunkable` trait to support Merkle proofs.
+#[proc_macro_derive(Chunkable)]
+pub fn derive_chunkable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let data = &input.data;
@@ -986,7 +1070,21 @@ pub fn derive_prove(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
 
-    let expansion = derive_prove_impl(data, name, generics);
+    let expansion = derive_chunkable_impl(data, name, generics);
+    proc_macro::TokenStream::from(expansion)
+}
+
+/// Derive an implementation of the `Visitable` trait to support Merkle proofs.
+#[proc_macro_derive(Visitable)]
+pub fn derive_visitable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let data = &input.data;
+    validate_derive_input(data, &[]);
+    let name = &input.ident;
+    let generics = &input.generics;
+
+    let expansion = derive_visitable_impl(data, name, generics);
     proc_macro::TokenStream::from(expansion)
 }
 
@@ -1008,7 +1106,9 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let generalized_indexable_impl = derive_generalized_indexable_impl(data, name, generics);
 
-    let prove_impl = derive_prove_impl(data, name, generics);
+    let chunkable_impl = derive_chunkable_impl(data, name, generics);
+
+    let visitable_impl = derive_visitable_impl(data, name, generics);
 
     let simple_serialize_impl = derive_simple_serialize_impl(name, generics);
 
@@ -1019,7 +1119,9 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         #generalized_indexable_impl
 
-        #prove_impl
+        #chunkable_impl
+
+        #visitable_impl
 
         #simple_serialize_impl
     };

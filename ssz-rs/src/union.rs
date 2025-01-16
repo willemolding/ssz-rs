@@ -136,7 +136,7 @@ where
 {
     fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         if index >= 2 {
-            Err(visitor::Error::InvalidInnerIndex.into())
+            Err(visitor::VisitorError::InvalidInnerIndex.into())
         } else {
             match self {
                 Some(value) => visitor.visit(value),

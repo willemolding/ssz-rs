@@ -177,6 +177,7 @@ mod exports {
         ser::{Serialize, SerializeError},
         uint::U256,
         vector::Vector,
+        visitor::{Visitable, Visitor, VisitorError},
     };
 
     /// `serialize` is a convenience function for taking a value that
@@ -202,8 +203,6 @@ mod exports {
     }
 }
 
-use visitor::Visitable;
-
 pub use crate::exports::*;
 
 /// The `prelude` contains common traits and types a user of this library
@@ -216,7 +215,7 @@ pub mod prelude {
     #[doc(hidden)]
     pub use crate as ssz_rs;
     pub use ssz_rs_derive::{
-        GeneralizedIndexable, HashTreeRoot, Prove, Serializable, SimpleSerialize,
+        Chunkable, GeneralizedIndexable, HashTreeRoot, Serializable, SimpleSerialize, Visitable,
     };
 }
 
