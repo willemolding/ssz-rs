@@ -163,20 +163,6 @@ where
         }
     }
 
-    fn prove_element(&self, index: usize, prover: &mut Prover) -> Result<(), MerkleizationError> {
-        if index >= 2 {
-            Err(MerkleizationError::InvalidInnerIndex)
-        } else {
-            match self {
-                Some(value) => prover.compute_proof(value),
-                None => {
-                    let leaf = 0usize;
-                    prover.compute_proof(&leaf)
-                }
-            }
-        }
-    }
-
     fn decoration(&self) -> Option<usize> {
         match self {
             Some(_) => Some(1),

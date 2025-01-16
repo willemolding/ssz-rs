@@ -298,15 +298,6 @@ where
         self.assemble_chunks()
     }
 
-    fn prove_element(&self, index: usize, prover: &mut Prover) -> Result<(), MerkleizationError> {
-        if index >= N {
-            Err(MerkleizationError::InvalidInnerIndex)
-        } else {
-            let child = &self[index];
-            prover.compute_proof(child)
-        }
-    }
-
     fn decoration(&self) -> Option<usize> {
         Some(self.len())
     }

@@ -144,15 +144,6 @@ where
             pack(self)
         }
     }
-
-    fn prove_element(&self, index: usize, prover: &mut Prover) -> Result<(), MerkleizationError> {
-        if index >= N {
-            Err(MerkleizationError::InvalidInnerIndex)
-        } else {
-            let child = &self[index];
-            prover.compute_proof(child)
-        }
-    }
 }
 
 impl<T, const N: usize> SimpleSerialize for [T; N] where T: SimpleSerialize {}

@@ -155,7 +155,10 @@ pub trait Serializable: Serialize + Deserialize {
 /// `SimpleSerialize` is a trait for types conforming to the SSZ spec.
 /// These types can be encoded and decoded while also supporting the
 /// merkelization scheme of SSZ.
-pub trait SimpleSerialize: Serializable + HashTreeRoot + GeneralizedIndexable + Prove {}
+pub trait SimpleSerialize:
+    Serializable + HashTreeRoot + GeneralizedIndexable + Prove + Visitable
+{
+}
 
 mod exports {
     pub use crate::{
@@ -198,6 +201,8 @@ mod exports {
         T::deserialize(encoding)
     }
 }
+
+use visitor::Visitable;
 
 pub use crate::exports::*;
 
