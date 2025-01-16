@@ -218,7 +218,7 @@ impl<const N: usize> GeneralizedIndexable for Bitlist<N> {
     }
 }
 
-impl<V, const N: usize> Visitable<V> for Bitlist<N> where V: Visitor {}
+impl<const N: usize> Visitable for Bitlist<N> {}
 
 impl<const N: usize> Prove for Bitlist<N> {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

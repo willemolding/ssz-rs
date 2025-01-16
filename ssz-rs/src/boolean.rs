@@ -63,7 +63,7 @@ impl GeneralizedIndexable for bool {
     }
 }
 
-impl<V> Visitable<V> for bool where V: Visitor {}
+impl Visitable for bool {}
 
 impl Prove for bool {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

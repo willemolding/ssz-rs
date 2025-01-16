@@ -58,7 +58,7 @@ impl HashTreeRoot for Node {
 
 impl GeneralizedIndexable for Node {}
 
-impl<V> Visitable<V> for Node where V: Visitor {}
+impl Visitable for Node {}
 
 impl Prove for Node {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

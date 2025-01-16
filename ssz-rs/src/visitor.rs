@@ -22,8 +22,8 @@ impl Display for Error {
     }
 }
 
-pub trait Visitable<V: Visitor> {
-    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
+pub trait Visitable {
+    fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         Err(Error::NoInnerElement.into())
     }
 }
@@ -31,7 +31,7 @@ pub trait Visitable<V: Visitor> {
 pub trait Visitor: Sized {
     type Error: From<Error>;
 
-    fn visit<T: SimpleSerialize + Visitable<Self> + ?Sized>(
+    fn visit<T: SimpleSerialize + Visitable + ?Sized>(
         &mut self,
         element: &T,
     ) -> Result<(), Self::Error>;

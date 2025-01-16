@@ -130,12 +130,11 @@ where
     }
 }
 
-impl<T, V> Visitable<V> for Option<T>
+impl<T> Visitable for Option<T>
 where
-    T: SimpleSerialize + Visitable<V>,
-    V: Visitor,
+    T: SimpleSerialize + Visitable,
 {
-    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
+    fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         if index >= 2 {
             Err(visitor::Error::InvalidInnerIndex.into())
         } else {

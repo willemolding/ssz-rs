@@ -276,12 +276,11 @@ where
     }
 }
 
-impl<T, V, const N: usize> Visitable<V> for List<T, N>
+impl<T, const N: usize> Visitable for List<T, N>
 where
-    T: SimpleSerialize + Visitable<V>,
-    V: Visitor,
+    T: SimpleSerialize + Visitable,
 {
-    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
+    fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
         if index >= N {
             Err(visitor::Error::InvalidInnerIndex.into())
         } else {

@@ -205,7 +205,7 @@ impl<const N: usize> GeneralizedIndexable for Bitvector<N> {
     }
 }
 
-impl<V, const N: usize> Visitable<V> for Bitvector<N> where V: Visitor {}
+impl<const N: usize> Visitable for Bitvector<N> {}
 
 impl<const N: usize> Prove for Bitvector<N> {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

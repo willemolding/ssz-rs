@@ -122,7 +122,7 @@ impl Prover {
 impl Visitor for Prover {
     type Error = Error;
 
-    fn visit<T: SimpleSerialize + Visitable<Self> + ?Sized>(
+    fn visit<T: SimpleSerialize + Visitable + ?Sized>(
         &mut self,
         data: &T,
     ) -> Result<(), Self::Error> {

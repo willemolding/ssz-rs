@@ -73,7 +73,7 @@ macro_rules! define_uint {
             }
         }
 
-        impl<V> Visitable<V> for $uint where V: Visitor {}
+        impl Visitable for $uint {}
 
         impl Prove for $uint {
             fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
@@ -156,7 +156,7 @@ impl GeneralizedIndexable for U256 {
     }
 }
 
-impl<V> Visitable<V> for U256 where V: Visitor {}
+impl Visitable for U256 {}
 
 impl Prove for U256 {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
