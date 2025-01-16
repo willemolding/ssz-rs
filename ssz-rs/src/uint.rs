@@ -2,8 +2,8 @@ use crate::{
     de::{Deserialize, DeserializeError},
     lib::*,
     merkleization::{
-        pack_bytes, proofs::Prove, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node,
-        BYTES_PER_CHUNK,
+        pack_bytes, proofs::Chunkable, GeneralizedIndexable, HashTreeRoot, MerkleizationError,
+        Node, BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError},
     visitor::{Visitable, Visitor},
@@ -75,7 +75,7 @@ macro_rules! define_uint {
 
         impl Visitable for $uint {}
 
-        impl Prove for $uint {
+        impl Chunkable for $uint {
             fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
                 let mut root = Vec::with_capacity(BYTES_PER_CHUNK);
                 let _ = self.serialize(&mut root)?;
@@ -158,7 +158,7 @@ impl GeneralizedIndexable for U256 {
 
 impl Visitable for U256 {}
 
-impl Prove for U256 {
+impl Chunkable for U256 {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
         Ok(self.as_le_bytes().to_vec())
     }

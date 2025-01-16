@@ -156,7 +156,7 @@ pub trait Serializable: Serialize + Deserialize {
 /// These types can be encoded and decoded while also supporting the
 /// merkelization scheme of SSZ.
 pub trait SimpleSerialize:
-    Serializable + HashTreeRoot + GeneralizedIndexable + Prove + Visitable
+    Serializable + HashTreeRoot + GeneralizedIndexable + Chunkable + Visitable
 {
 }
 
@@ -170,7 +170,7 @@ mod exports {
         merkleization::{
             generalized_index::default_generalized_index,
             multiproofs,
-            proofs::{self, is_valid_merkle_branch, Prove},
+            proofs::{self, is_valid_merkle_branch, Chunkable},
             GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
             PathElement,
         },

@@ -60,7 +60,7 @@ impl GeneralizedIndexable for Node {}
 
 impl Visitable for Node {}
 
-impl Prove for Node {
+impl Chunkable for Node {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
         Ok(self.to_vec())
     }

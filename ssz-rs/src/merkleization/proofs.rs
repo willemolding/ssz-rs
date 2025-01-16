@@ -142,7 +142,7 @@ impl From<GeneralizedIndex> for Prover {
 }
 
 /// Required functionality to support computing Merkle proofs.
-pub trait Prove: GeneralizedIndexable {
+pub trait Chunkable: GeneralizedIndexable {
     /// Compute the "chunks" of this type as required for the SSZ merkle tree computation.
     /// Default implementation signals an error. Implementing types should override
     /// to provide the correct behavior.

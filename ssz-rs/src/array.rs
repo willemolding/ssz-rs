@@ -4,7 +4,7 @@ use crate::{
     lib::*,
     merkleization::{
         elements_to_chunks, get_power_of_two_ceil, merkleize, pack,
-        proofs::{Prove, Prover},
+        proofs::{Chunkable, Prover},
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
         PathElement,
     },
@@ -132,7 +132,7 @@ where
     }
 }
 
-impl<T, const N: usize> Prove for [T; N]
+impl<T, const N: usize> Chunkable for [T; N]
 where
     T: SimpleSerialize,
 {

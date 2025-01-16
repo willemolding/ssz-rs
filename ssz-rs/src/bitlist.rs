@@ -3,7 +3,7 @@ use crate::{
     error::{Error, InstanceError},
     lib::*,
     merkleization::{
-        get_power_of_two_ceil, merkleize, mix_in_length, pack_bytes, proofs::Prove,
+        get_power_of_two_ceil, merkleize, mix_in_length, pack_bytes, proofs::Chunkable,
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
         PathElement, BITS_PER_CHUNK,
     },
@@ -220,7 +220,7 @@ impl<const N: usize> GeneralizedIndexable for Bitlist<N> {
 
 impl<const N: usize> Visitable for Bitlist<N> {}
 
-impl<const N: usize> Prove for Bitlist<N> {
+impl<const N: usize> Chunkable for Bitlist<N> {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {
         self.pack_bits()
     }

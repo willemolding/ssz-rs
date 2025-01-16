@@ -3,7 +3,7 @@ use crate::{
     lib::*,
     merkleization::{
         mix_in_selector,
-        proofs::{Prove, Prover},
+        proofs::{Chunkable, Prover},
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
         PathElement, BYTES_PER_CHUNK,
     },
@@ -149,7 +149,7 @@ where
     }
 }
 
-impl<T> Prove for Option<T>
+impl<T> Chunkable for Option<T>
 where
     T: SimpleSerialize,
 {
