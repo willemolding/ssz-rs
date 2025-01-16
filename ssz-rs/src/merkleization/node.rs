@@ -1,4 +1,9 @@
-use crate::{lib::*, merkleization::BYTES_PER_CHUNK, prelude::*};
+use crate::{
+    lib::*,
+    merkleization::BYTES_PER_CHUNK,
+    prelude::*,
+    visitor::{Visitable, Visitor},
+};
 
 /// Represents a node in a Merkle tree as defined by the SSZ spec.
 pub type Node = alloy_primitives::B256;
@@ -16,13 +21,13 @@ impl Deserialize for Node {
             return Err(DeserializeError::ExpectedFurtherInput {
                 provided: encoding.len(),
                 expected: BYTES_PER_CHUNK,
-            })
+            });
         }
         if encoding.len() > BYTES_PER_CHUNK {
             return Err(DeserializeError::AdditionalInput {
                 provided: encoding.len(),
                 expected: BYTES_PER_CHUNK,
-            })
+            });
         }
 
         // SAFETY: index is safe because encoding.len() == byte_size; qed
@@ -52,6 +57,8 @@ impl HashTreeRoot for Node {
 }
 
 impl GeneralizedIndexable for Node {}
+
+impl<V> Visitable<V> for Node where V: Visitor {}
 
 impl Prove for Node {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

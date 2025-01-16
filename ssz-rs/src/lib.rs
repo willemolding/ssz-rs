@@ -102,6 +102,7 @@ mod serde;
 mod uint;
 mod union;
 mod vector;
+mod visitor;
 
 mod lib {
     mod core {

@@ -9,6 +9,7 @@ use crate::{
         PathElement,
     },
     ser::{Serialize, SerializeError, Serializer},
+    visitor::{self, Visitable, Visitor},
     Serializable, SimpleSerialize,
 };
 
@@ -31,7 +32,7 @@ where
 {
     fn serialize(&self, buffer: &mut Vec<u8>) -> Result<usize, SerializeError> {
         if N == 0 {
-            return Err(TypeError::InvalidBound(N).into())
+            return Err(TypeError::InvalidBound(N).into());
         }
         let mut serializer = Serializer::default();
         for element in self {
@@ -47,7 +48,7 @@ where
 {
     fn deserialize(encoding: &[u8]) -> Result<Self, DeserializeError> {
         if N == 0 {
-            return Err(TypeError::InvalidBound(N).into())
+            return Err(TypeError::InvalidBound(N).into());
         }
 
         if !T::is_variable_size() {
@@ -56,13 +57,13 @@ where
                 return Err(DeserializeError::ExpectedFurtherInput {
                     provided: encoding.len(),
                     expected: expected_length,
-                })
+                });
             }
             if encoding.len() > expected_length {
                 return Err(DeserializeError::AdditionalInput {
                     provided: encoding.len(),
                     expected: expected_length,
-                })
+                });
             }
         }
         let elements = deserialize_homogeneous_composite(encoding)?;
@@ -102,7 +103,7 @@ where
             match next {
                 PathElement::Index(i) => {
                     if *i >= N {
-                        return Err(MerkleizationError::InvalidPathElement(next.clone()))
+                        return Err(MerkleizationError::InvalidPathElement(next.clone()));
                     }
                     let chunk_position = i * T::item_length() / 32;
                     let child =
@@ -113,6 +114,21 @@ where
             }
         } else {
             Ok(parent)
+        }
+    }
+}
+
+impl<T, V, const N: usize> Visitable<V> for [T; N]
+where
+    T: SimpleSerialize + Visitable<V>,
+    V: Visitor,
+{
+    fn visit_element(&self, index: usize, visitor: &mut V) -> Result<(), visitor::Error> {
+        if index >= N {
+            Err(visitor::Error::InvalidInnerIndex)
+        } else {
+            let child = &self[index];
+            visitor.visit(child)
         }
     }
 }

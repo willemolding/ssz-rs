@@ -8,6 +8,7 @@ use crate::{
         PathElement, BITS_PER_CHUNK,
     },
     ser::{Serialize, SerializeError},
+    visitor::{Visitable, Visitor},
     Serializable, SimpleSerialize,
 };
 #[cfg(feature = "serde")]
@@ -81,7 +82,7 @@ impl<const N: usize> Bitlist<N> {
         with_length_bit: bool,
     ) -> Result<usize, SerializeError> {
         if self.len() > N {
-            return Err(InstanceError::Bounded { bound: N, provided: self.len() }.into())
+            return Err(InstanceError::Bounded { bound: N, provided: self.len() }.into());
         }
         let start_len = buffer.len();
         buffer.extend_from_slice(self.as_raw_slice());
@@ -139,7 +140,7 @@ impl<const N: usize> Deserialize for Bitlist<N> {
     fn deserialize(encoding: &[u8]) -> Result<Self, DeserializeError> {
         // validate byte length - min
         if encoding.is_empty() {
-            return Err(DeserializeError::ExpectedFurtherInput { provided: 0, expected: 1 })
+            return Err(DeserializeError::ExpectedFurtherInput { provided: 0, expected: 1 });
         }
 
         // validate byte length - max
@@ -148,12 +149,12 @@ impl<const N: usize> Deserialize for Bitlist<N> {
             return Err(DeserializeError::AdditionalInput {
                 provided: encoding.len(),
                 expected: max_len,
-            })
+            });
         }
 
         let (last_byte, prefix) = encoding.split_last().unwrap();
         if *last_byte == 0u8 {
-            return Err(DeserializeError::InvalidByte(*last_byte))
+            return Err(DeserializeError::InvalidByte(*last_byte));
         }
 
         let mut result = BitlistInner::from_slice(prefix);
@@ -170,7 +171,7 @@ impl<const N: usize> Deserialize for Bitlist<N> {
             return Err(DeserializeError::InvalidInstance(InstanceError::Bounded {
                 bound: N,
                 provided: total_members,
-            }))
+            }));
         }
 
         result.extend_from_bitslice(&last[..additional_members]);
@@ -199,13 +200,13 @@ impl<const N: usize> GeneralizedIndexable for Bitlist<N> {
             match next {
                 PathElement::Index(i) => {
                     if *i >= N {
-                        return Err(MerkleizationError::InvalidPathElement(next.clone()))
+                        return Err(MerkleizationError::InvalidPathElement(next.clone()));
                     }
                     let chunk_position = i / 256;
-                    let child = parent *
-                        2 *
-                        get_power_of_two_ceil(<Self as GeneralizedIndexable>::chunk_count()) +
-                        chunk_position;
+                    let child = parent
+                        * 2
+                        * get_power_of_two_ceil(<Self as GeneralizedIndexable>::chunk_count())
+                        + chunk_position;
                     // NOTE: use `bool` as effective type of element
                     bool::compute_generalized_index(child, rest)
                 }
@@ -216,6 +217,8 @@ impl<const N: usize> GeneralizedIndexable for Bitlist<N> {
         }
     }
 }
+
+impl<V, const N: usize> Visitable<V> for Bitlist<N> where V: Visitor {}
 
 impl<const N: usize> Prove for Bitlist<N> {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

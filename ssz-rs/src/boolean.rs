@@ -6,6 +6,7 @@ use crate::{
         BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError},
+    visitor::{Visitable, Visitor},
     Serializable, SimpleSerialize,
 };
 
@@ -61,6 +62,8 @@ impl GeneralizedIndexable for bool {
         Self::size_hint()
     }
 }
+
+impl<V> Visitable<V> for bool where V: Visitor {}
 
 impl Prove for bool {
     fn chunks(&self) -> Result<Vec<u8>, MerkleizationError> {

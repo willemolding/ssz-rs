@@ -6,6 +6,7 @@ use crate::{
         compute_merkle_tree, GeneralizedIndex, GeneralizedIndexable, MerkleizationError as Error,
         Node, Path,
     },
+    visitor::{self, Visitable, Visitor},
 };
 use sha2::{Digest, Sha256};
 
@@ -88,6 +89,58 @@ impl Prover {
             let child_index = node_count + parent_index % node_count;
             self.proof.index = child_index;
             data.prove_element(local_index, self)?;
+            self.proof.index = parent_index;
+        } else {
+            // NOTE: leaf is within the current object, set a flag to grab from merkle tree later
+            is_leaf_local = true;
+        }
+        let chunks = data.chunks()?;
+        let mut tree = compute_merkle_tree(&mut self.hasher, &chunks, leaf_count)?;
+        if let Some(decoration) = decoration {
+            tree.mix_in_decoration(decoration, &mut self.hasher)?;
+        }
+
+        if is_leaf_local {
+            self.set_leaf(&tree[parent_index]);
+        }
+
+        let mut target = local_generalized_index;
+        for _ in 0..local_depth {
+            let sibling = if target % 2 != 0 { &tree[target - 1] } else { &tree[target + 1] };
+            self.extend_branch(sibling);
+            target /= 2;
+        }
+
+        let root = &tree[1];
+        self.set_witness(root);
+
+        Ok(())
+    }
+}
+
+impl Visitor for Prover {
+    fn visit<T: Visitable<Self> + ?Sized>(&mut self, data: &T) -> Result<(), visitor::Error> {
+        let chunk_count = T::chunk_count();
+        let mut leaf_count = chunk_count.next_power_of_two();
+        let parent_index = self.proof.index;
+        let decoration = data.decoration();
+        if decoration.is_some() {
+            // double to account for decoration layer
+            leaf_count *= 2;
+        }
+
+        let (local_depth, local_index, local_generalized_index) =
+            compute_local_merkle_coordinates(parent_index, leaf_count)?;
+
+        let mut is_leaf_local = false;
+        if local_generalized_index < parent_index {
+            // NOTE: need to recurse to children to find ultimate leaf
+            let parent_depth = get_depth(parent_index)?;
+            let child_depth = parent_depth - local_depth;
+            let node_count = 2usize.pow(child_depth);
+            let child_index = node_count + parent_index % node_count;
+            self.proof.index = child_index;
+            data.visit_element(local_index, self)?;
             self.proof.index = parent_index;
         } else {
             // NOTE: leaf is within the current object, set a flag to grab from merkle tree later
@@ -207,7 +260,7 @@ pub fn is_valid_merkle_branch(
     root: Node,
 ) -> Result<(), Error> {
     if branch.len() != depth {
-        return Err(Error::InvalidProof)
+        return Err(Error::InvalidProof);
     }
 
     let mut derived_root = leaf;
