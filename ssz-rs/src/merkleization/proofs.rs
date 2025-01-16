@@ -66,15 +66,16 @@ impl Prover {
     fn set_witness(&mut self, witness: &[u8]) {
         self.witness = witness.try_into().expect("is correct size");
     }
+
+    pub fn compute_proof<T: SimpleSerialize + ?Sized>(&mut self, data: &T) -> Result<(), Error> {
+        self.visit(data)
+    }
 }
 
 impl Visitor for Prover {
     type Error = Error;
 
-    fn visit<T: SimpleSerialize + Visitable + ?Sized>(
-        &mut self,
-        data: &T,
-    ) -> Result<(), Self::Error> {
+    fn visit<T: SimpleSerialize + ?Sized>(&mut self, data: &T) -> Result<(), Self::Error> {
         let chunk_count = T::chunk_count();
         let mut leaf_count = chunk_count.next_power_of_two();
         let parent_index = self.proof.index;
@@ -159,7 +160,7 @@ pub trait Chunkable: GeneralizedIndexable {
     }
 }
 
-trait Prove: SimpleSerialize {
+pub trait Prove: SimpleSerialize {
     /// Compute a Merkle proof of `Self` at the type's `path`, along with the root of the Merkle
     /// tree as a witness value.
     fn prove(&self, path: Path) -> Result<ProofAndWitness, Error> {

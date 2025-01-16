@@ -170,7 +170,7 @@ mod exports {
         merkleization::{
             generalized_index::default_generalized_index,
             multiproofs,
-            proofs::{self, is_valid_merkle_branch, Chunkable},
+            proofs::{self, is_valid_merkle_branch, Chunkable, Prove},
             GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
             PathElement,
         },
