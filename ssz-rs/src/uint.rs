@@ -6,7 +6,7 @@ use crate::{
         Node, BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError},
-    visitor::{Visitable, Visitor},
+    visitor::Visitable,
     Serializable, SimpleSerialize, BITS_PER_BYTE,
 };
 

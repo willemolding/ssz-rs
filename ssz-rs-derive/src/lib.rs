@@ -591,36 +591,13 @@ fn derive_generalized_indexable_impl(
 fn derive_chunkable_impl(data: &Data, name: &Ident, generics: &Generics) -> TokenStream {
     let (impl_generics, ty_generics, _) = generics.split_for_impl();
 
-    let (chunks_impl, prove_element_impl, decoration_impl) = match data {
+    let (chunks_impl, decoration_impl) = match data {
         Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => {
-                let fields = &fields.named;
-                let field_count = fields.len();
-                let impl_by_field = fields.iter().enumerate().map(|(i, field)| {
-                    let field_name = field.ident.as_ref().expect("only named fields");
-                    quote! {
-                         #i => {
-                            let child = &self.#field_name;
-                            prover.compute_proof(child)
-                        }
-                    }
-                });
+            Fields::Named(ref _fields) => {
                 let chunks_impl = quote! {
                     self.assemble_chunks()
                 };
-
-                let prove_element_impl = quote! {
-                    if index >= #field_count {
-                        Err(MerkleizationError::InvalidInnerIndex)
-                    } else {
-                        match index {
-                            #(#impl_by_field)*
-                            _ => unreachable!("validated `index` to be within container type"),
-                        }
-                    }
-                };
-
-                (chunks_impl, prove_element_impl, None)
+                (chunks_impl, None)
             }
             Fields::Unnamed(..) => {
                 // NOTE: new type pattern, proxy to wrapped type...
@@ -628,33 +605,23 @@ fn derive_chunkable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                     self.0.chunks()
                 };
 
-                let prove_element_impl = quote! {
-                    self.0.prove_element(index, prover)
-                };
-
                 let decoration_impl = quote! {
                     fn decoration(&self) -> Option<usize> {
                         self.0.decoration()
                     }
                 };
-                (chunks_impl, prove_element_impl, Some(decoration_impl))
+                (chunks_impl, Some(decoration_impl))
             }
             Fields::Unit => unreachable!("validated to exclude this type"),
         },
         Data::Enum(ref data) => {
-            let variant_count = data.variants.len();
-
-            let implementations = data.variants.iter().enumerate().map(|(i, variant)| {
+            let decoration_by_variant = data.variants.iter().enumerate().map(|(i, variant)| {
                 let variant_name = &variant.ident;
                 match &variant.fields {
                     Fields::Unnamed(..) => {
-                        let prove_element_impl = quote! {
-                            Self::#variant_name(value) => prover.compute_proof(value),
-                        };
-                        let decoration_impl = quote! {
+                        quote! {
                             Self::#variant_name(_) => Some(#i),
-                        };
-                        (prove_element_impl, decoration_impl)
+                        }
                     }
                     Fields::Unit => {
                         // NOTE: this has already been validated to conform to:
@@ -662,33 +629,14 @@ fn derive_chunkable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                         if i != 0 || !is_valid_none_identifier(variant_name) {
                             panic!("internal validation inconsistency; check proc derive macro");
                         }
-                        (
-                            quote! {
-                                Self::None => {
-                                    let leaf = 0usize;
-                                    prover.compute_proof(&leaf)
-                                }
-                            },
-                            quote! {
-                                Self::None => Some(#i),
-                            },
-                        )
+                        quote! {
+                            Self::None => Some(#i),
+                        }
                     }
                     _ => unreachable!("other variants validated to not exist"),
                 }
             });
-            let (impl_by_variant, decoration_by_variant): (Vec<_>, Vec<_>) =
-                implementations.unzip();
 
-            let prove_element_impl = quote! {
-                if index >= #variant_count {
-                    Err(ssz_rs::MerkleizationError::InvalidInnerIndex)
-                } else {
-                    match self {
-                        #(#impl_by_variant)*
-                    }
-                }
-            };
             let chunks_impl = quote! {
                 self.assemble_chunks()
             };
@@ -699,7 +647,7 @@ fn derive_chunkable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                     }
                 }
             };
-            (chunks_impl, prove_element_impl, Some(decoration_impl))
+            (chunks_impl, Some(decoration_impl))
         }
         Data::Union(..) => unreachable!("data was already validated to exclude union types"),
     };

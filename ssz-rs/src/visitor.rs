@@ -24,7 +24,7 @@ impl Display for VisitorError {
 /// A trait for types that can be visited by a `Visitor`.
 /// All types that implement SimpleSerialize are visitable which is how proving and other algorithms are implemented
 pub trait Visitable {
-    fn visit_element<V: Visitor>(&self, index: usize, visitor: &mut V) -> Result<(), V::Error> {
+    fn visit_element<V: Visitor>(&self, _index: usize, _visitor: &mut V) -> Result<(), V::Error> {
         Err(VisitorError::NoInnerElement.into())
     }
 }

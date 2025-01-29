@@ -4,12 +4,11 @@ use crate::{
     lib::*,
     merkleization::{
         elements_to_chunks, get_power_of_two_ceil, merkleize, mix_in_length, pack,
-        proofs::{Chunkable, Prover},
-        GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
-        PathElement, BYTES_PER_CHUNK,
+        proofs::Chunkable, GeneralizedIndex, GeneralizedIndexable, HashTreeRoot,
+        MerkleizationError, Node, Path, PathElement, BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError, Serializer},
-    visitor::{self, Visitable, Visitor, VisitorError},
+    visitor::{self, Visitable, Visitor},
     Serializable, SimpleSerialize,
 };
 

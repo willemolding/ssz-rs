@@ -6,7 +6,7 @@ use crate::{
         compute_merkle_tree, GeneralizedIndex, GeneralizedIndexable, MerkleizationError as Error,
         Node, Path,
     },
-    visitor::{self, Visitable, Visitor},
+    visitor::Visitor,
     SimpleSerialize,
 };
 use sha2::{Digest, Sha256};

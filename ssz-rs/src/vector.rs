@@ -3,8 +3,7 @@ use crate::{
     error::{Error, InstanceError, TypeError},
     lib::*,
     merkleization::{
-        elements_to_chunks, get_power_of_two_ceil, merkleize, pack,
-        proofs::{Chunkable, Prover},
+        elements_to_chunks, get_power_of_two_ceil, merkleize, pack, proofs::Chunkable,
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
         PathElement,
     },
@@ -327,7 +326,12 @@ impl<'de, T: Serializable + serde::Deserialize<'de>, const N: usize> serde::Dese
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lib::cmp::Ordering, list::List, serialize, Prove, U256};
+    use crate::{
+        lib::cmp::Ordering,
+        list::List,
+        proofs::{Prove, Prover},
+        serialize, U256,
+    };
 
     const COUNT: usize = 32;
 

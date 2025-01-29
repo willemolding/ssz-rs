@@ -3,8 +3,7 @@ use crate::{
     error::{InstanceError, TypeError},
     lib::*,
     merkleization::{
-        elements_to_chunks, get_power_of_two_ceil, merkleize, pack,
-        proofs::{Chunkable, Prover},
+        elements_to_chunks, get_power_of_two_ceil, merkleize, pack, proofs::Chunkable,
         GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
         PathElement,
     },

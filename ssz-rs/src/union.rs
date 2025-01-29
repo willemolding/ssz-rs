@@ -2,10 +2,8 @@ use crate::{
     de::{Deserialize, DeserializeError},
     lib::*,
     merkleization::{
-        mix_in_selector,
-        proofs::{Chunkable, Prover},
-        GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
-        PathElement, BYTES_PER_CHUNK,
+        mix_in_selector, proofs::Chunkable, GeneralizedIndex, GeneralizedIndexable, HashTreeRoot,
+        MerkleizationError, Node, Path, PathElement, BYTES_PER_CHUNK,
     },
     ser::{Serialize, SerializeError},
     visitor::{self, Visitable, Visitor},
