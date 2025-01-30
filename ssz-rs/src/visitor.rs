@@ -22,7 +22,8 @@ impl Display for VisitorError {
 }
 
 /// A trait for types that can be visited by a `Visitor`.
-/// All types that implement SimpleSerialize are visitable which is how proving and other algorithms are implemented
+/// All types that implement SimpleSerialize are visitable which is how proving and other algorithms
+/// are implemented
 pub trait Visitable {
     fn visit_element<V: Visitor>(&self, _index: usize, _visitor: &mut V) -> Result<(), V::Error> {
         Err(VisitorError::NoInnerElement.into())
@@ -32,7 +33,8 @@ pub trait Visitable {
 /// A trait for implementing the visitor pattern to traverse the SSZ data structures
 ///
 /// Examples of visitors are the Prover for generating SSZ Merkle proofs.
-/// Crate consumers can implement their own visitors to add diffent algorithms for generating proofs or other behaviour
+/// Crate consumers can implement their own visitors to add diffent algorithms for generating proofs
+/// or other behaviour
 pub trait Visitor: Sized {
     type Error: From<VisitorError>;
 
