@@ -288,7 +288,7 @@ where
         }
     }
 
-    fn element_count(&self) -> usize {
+    fn element_count() -> usize {
         N
     }
 }

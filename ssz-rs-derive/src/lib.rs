@@ -767,7 +767,7 @@ fn derive_visitable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                 #visit_element_impl
             }
 
-            fn element_count(&self) -> usize {
+            fn element_count() -> usize {
                 #element_count_impl
             }
         }

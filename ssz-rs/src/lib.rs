@@ -172,7 +172,7 @@ mod exports {
             multiproofs,
             proofs::{self, is_valid_merkle_branch, Chunkable, Prove},
             GeneralizedIndex, GeneralizedIndexable, HashTreeRoot, MerkleizationError, Node, Path,
-            PathElement,
+            PathElement, Tree,
         },
         ser::{Serialize, SerializeError},
         uint::U256,
