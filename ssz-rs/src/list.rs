@@ -288,8 +288,8 @@ where
         }
     }
 
-    fn element_count() -> usize {
-        N
+    fn element_count(&self) -> usize {
+        self.len()
     }
 }
 

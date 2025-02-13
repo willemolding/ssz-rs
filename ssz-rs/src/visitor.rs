@@ -29,7 +29,7 @@ pub trait Visitable {
         Err(VisitorError::NoInnerElement.into())
     }
 
-    fn element_count() -> usize {
+    fn element_count(&self) -> usize {
         0
     }
 }
