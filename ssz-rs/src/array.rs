@@ -129,6 +129,10 @@ where
             visitor.visit(child)
         }
     }
+
+    fn element_count(&self) -> usize {
+        N
+    }
 }
 
 impl<T, const N: usize> Chunkable for [T; N]

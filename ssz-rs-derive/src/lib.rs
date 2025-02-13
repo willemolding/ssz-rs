@@ -666,7 +666,7 @@ fn derive_chunkable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
 fn derive_visitable_impl(data: &Data, name: &Ident, generics: &Generics) -> TokenStream {
     let (impl_generics, ty_generics, _) = generics.split_for_impl();
 
-    let visit_element_impl = match data {
+    let (visit_element_impl, element_count_impl) = match data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
                 let fields = &fields.named;
@@ -681,22 +681,32 @@ fn derive_visitable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                     }
                 });
 
-                quote! {
-                    if index >= #field_count {
-                        Err(ssz_rs::VisitorError::InvalidInnerIndex.into())
-                    } else {
-                        match index {
-                            #(#impl_by_field)*
-                            _ => unreachable!("validated `index` to be within container type"),
+                (
+                    quote! {
+                        if index >= #field_count {
+                            Err(ssz_rs::VisitorError::InvalidInnerIndex.into())
+                        } else {
+                            match index {
+                                #(#impl_by_field)*
+                                _ => unreachable!("validated `index` to be within container type"),
+                            }
                         }
-                    }
-                }
+                    },
+                    quote! {
+                        #field_count
+                    },
+                )
             }
             Fields::Unnamed(..) => {
                 // NOTE: new type pattern, proxy to wrapped type...
-                quote! {
-                    self.0.visit_element(index, visitor)
-                }
+                (
+                    quote! {
+                        self.0.visit_element(index, visitor)
+                    },
+                    quote! {
+                        1
+                    },
+                )
             }
             Fields::Unit => unreachable!("validated to exclude this type"),
         },
@@ -729,15 +739,20 @@ fn derive_visitable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                 }
             });
 
-            quote! {
-                if index >= #variant_count {
-                    Err(ssz_rs::VisitorError::InvalidInnerIndex.into())
-                } else {
-                    match self {
-                        #(#impl_by_variant)*
+            (
+                quote! {
+                    if index >= #variant_count {
+                        Err(ssz_rs::VisitorError::InvalidInnerIndex.into())
+                    } else {
+                        match self {
+                            #(#impl_by_variant)*
+                        }
                     }
-                }
-            }
+                },
+                quote! {
+                    #variant_count
+                },
+            )
         }
         Data::Union(..) => unreachable!("data was already validated to exclude union types"),
     };
@@ -750,6 +765,10 @@ fn derive_visitable_impl(data: &Data, name: &Ident, generics: &Generics) -> Toke
                 visitor: &mut V,
             ) -> Result<(), V::Error> {
                 #visit_element_impl
+            }
+
+            fn element_count(&self) -> usize {
+                #element_count_impl
             }
         }
     }

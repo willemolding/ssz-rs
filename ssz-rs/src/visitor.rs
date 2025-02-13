@@ -28,6 +28,10 @@ pub trait Visitable {
     fn visit_element<V: Visitor>(&self, _index: usize, _visitor: &mut V) -> Result<(), V::Error> {
         Err(VisitorError::NoInnerElement.into())
     }
+
+    fn element_count(&self) -> usize {
+        0
+    }
 }
 
 /// A trait for implementing the visitor pattern to traverse the SSZ data structures

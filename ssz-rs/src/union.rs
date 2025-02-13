@@ -145,6 +145,10 @@ where
             }
         }
     }
+
+    fn element_count(&self) -> usize {
+        2
+    }
 }
 
 impl<T> Chunkable for Option<T>
