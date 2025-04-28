@@ -1,4 +1,6 @@
 //! Experimental support for multiproofs.
+use sha2::{digest::FixedOutput, Digest};
+
 use crate::{
     lib::*,
     merkleization::{
@@ -6,7 +8,7 @@ use crate::{
         GeneralizedIndex, MerkleizationError as Error, Node,
     },
 };
-use ethereum_hashing::hash32_concat;
+// use ethereum_hashing::hash32_concat;
 
 pub fn get_branch_indices(tree_index: GeneralizedIndex) -> Vec<GeneralizedIndex> {
     let mut focus = sibling(tree_index);
@@ -61,12 +63,20 @@ pub fn calculate_merkle_root(
             // hasher.update(next);
             // hasher.update(result);
             let r = result.clone();
-            result.copy_from_slice(&hash32_concat(next.as_slice(), r.as_slice()));
+            let mut h = sha2::Sha256::new();
+            h.update(next);
+            h.update(r.as_slice());
+            h.finalize_into(result.as_mut_slice().into());
+            // result.copy_from_slice(&hash32_concat(next.as_slice(), r.as_slice()));
         } else {
             // hasher.update(result);
             // hasher.update(next);
             let r = result.clone();
-            result.copy_from_slice(&hash32_concat(r.as_slice(), next.as_slice()));
+            let mut h = sha2::Sha256::new();
+            h.update(r.as_slice());
+            h.update(next);
+            h.finalize_into(result.as_mut_slice().into());
+            // result.copy_from_slice(&hash32_concat(r.as_slice(), next.as_slice()));
         }
         // result.copy_from_slice(&hash32_concat(next, result));
     }
@@ -124,7 +134,11 @@ pub fn calculate_multi_merkle_root(
             let left_input = objects.get(&left_index).expect("contains index").clone();
             let right_input = objects.get(&right_index).expect("contains index").clone();
             let parent = objects.entry(parent_index).or_default();
-            parent.copy_from_slice(&hash32_concat(left_input.as_slice(), right_input.as_slice()));
+            let mut h = sha2::Sha256::new();
+            h.update(left_input.as_slice());
+            h.update(right_input.as_slice());
+            h.finalize_into(parent.as_mut_slice().into());
+            // parent.copy_from_slice(&hash32_concat(left_input.as_slice(), right_input.as_slice()));
             keys.push(parent_index);
         }
         pos += 1;
