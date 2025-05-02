@@ -66,7 +66,7 @@ pub fn calculate_merkle_root(
             let mut h = sha2::Sha256::new();
             h.update(next);
             h.update(r.as_slice());
-            h.finalize_into(result.as_mut_slice().into());
+            Digest::finalize_into(h, result.as_mut_slice().into());
             // result.copy_from_slice(&hash32_concat(next.as_slice(), r.as_slice()));
         } else {
             // hasher.update(result);
@@ -75,7 +75,7 @@ pub fn calculate_merkle_root(
             let mut h = sha2::Sha256::new();
             h.update(r.as_slice());
             h.update(next);
-            h.finalize_into(result.as_mut_slice().into());
+            Digest::finalize_into(h, result.as_mut_slice().into());
             // result.copy_from_slice(&hash32_concat(r.as_slice(), next.as_slice()));
         }
         // result.copy_from_slice(&hash32_concat(next, result));
@@ -137,7 +137,7 @@ pub fn calculate_multi_merkle_root(
             let mut h = sha2::Sha256::new();
             h.update(left_input.as_slice());
             h.update(right_input.as_slice());
-            h.finalize_into(parent.as_mut_slice().into());
+            Digest::finalize_into(h, parent.as_mut_slice().into());
             // parent.copy_from_slice(&hash32_concat(left_input.as_slice(), right_input.as_slice()));
             keys.push(parent_index);
         }

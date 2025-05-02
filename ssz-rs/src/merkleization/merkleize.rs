@@ -57,7 +57,7 @@ fn hash_nodes(a: impl AsRef<[u8]>, b: impl AsRef<[u8]>, out: &mut [u8]) {
     let mut h = sha2::Sha256::new();
     h.update(a.as_ref());
     h.update(b.as_ref());
-    h.finalize_into(out.into());
+    Digest::finalize_into(h, out.into());
     // out.copy_from_slice(&hash32_concat(a.as_ref(), b.as_ref()));
 }
 
@@ -157,7 +157,7 @@ impl Tree {
         let mut h = sha2::Sha256::new();
         h.update(l);
         h.update(r);
-        h.finalize_into((&mut self[1]).into());
+        Digest::finalize_into(h, (&mut self[1]).into());
         // self[1].copy_from_slice(&hash32_concat(&l, &r));
         Ok(())
     }
