@@ -1,4 +1,5 @@
 //! Support for computing Merkle trees.
+
 use crate::{
     lib::*,
     merkleization::{MerkleizationError as Error, Node, BYTES_PER_CHUNK},
@@ -7,7 +8,7 @@ use crate::{
 };
 #[cfg(feature = "serde")]
 use alloy_primitives::hex::FromHex;
-use ethereum_hashing::hash32_concat;
+use sha2::{digest::FixedOutput, Digest};
 
 // The generalized index for the root of the "decorated" type in any Merkleized type that supports
 // decoration.
@@ -53,7 +54,11 @@ where
 }
 
 fn hash_nodes(a: impl AsRef<[u8]>, b: impl AsRef<[u8]>, out: &mut [u8]) {
-    out.copy_from_slice(&hash32_concat(a.as_ref(), b.as_ref()));
+    let mut h = sha2::Sha256::new();
+    h.update(a.as_ref());
+    h.update(b.as_ref());
+    Digest::finalize_into(h, out.into());
+    // out.copy_from_slice(&hash32_concat(a.as_ref(), b.as_ref()));
 }
 
 const MAX_MERKLE_TREE_DEPTH: usize = 64;
@@ -149,7 +154,11 @@ impl Tree {
 
         let l = self[INNER_ROOT_GENERALIZED_INDEX].to_vec().clone();
         let r = self[DECORATION_GENERALIZED_INDEX].to_vec().clone();
-        self[1].copy_from_slice(&hash32_concat(&l, &r));
+        let mut h = sha2::Sha256::new();
+        h.update(l);
+        h.update(r);
+        Digest::finalize_into(h, (&mut self[1]).into());
+        // self[1].copy_from_slice(&hash32_concat(&l, &r));
         Ok(())
     }
 

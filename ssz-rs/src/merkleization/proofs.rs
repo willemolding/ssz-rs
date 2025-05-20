@@ -1,6 +1,9 @@
 //! Support for constructing and verifying Merkle proofs.
 use core::default;
 
+use serde::de;
+use sha2::{digest::FixedOutput, Digest};
+
 pub use crate::merkleization::generalized_index::log_2;
 use crate::{
     compact_multiproofs::{self, Descriptor},
@@ -10,7 +13,6 @@ use crate::{
         Path, Tree,
     },
 };
-use ethereum_hashing::hash32_concat;
 
 /// Convenience type for a Merkle proof and the root of the Merkle tree, which serves as
 /// "witness" that the proof is valid.
@@ -390,14 +392,21 @@ pub fn is_valid_merkle_branch(
     }
 
     let mut derived_root = leaf;
+    let mut h = sha2::Sha256::new();
 
     for (i, node) in branch.iter().enumerate() {
         if (index / 2usize.pow(i as u32)) % 2 != 0 {
             let root = derived_root.clone();
-            derived_root.copy_from_slice(&hash32_concat(node.as_slice(), root.as_slice()));
+            h.update(node);
+            h.update(root);
+            h.finalize_into_reset(derived_root.as_mut_slice().into());
+            // derived_root.copy_from_slice(&hash32_concat(node.as_slice(), root.as_slice()));
         } else {
             let root = derived_root.clone();
-            derived_root.copy_from_slice(&hash32_concat(root.as_slice(), node.as_slice()));
+            h.update(root);
+            h.update(node);
+            h.finalize_into_reset(derived_root.as_mut_slice().into());
+            // derived_root.copy_from_slice(&hash32_concat(root.as_slice(), node.as_slice()));
         }
     }
 
